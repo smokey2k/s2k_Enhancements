@@ -1,0 +1,32 @@
+## Interface: 70300
+## Title: s2k:Enhancements
+## Notes: s2k Enhancements - custom nameplates, quest enhancements, addon integrations and an LDB-accessible standalone configuration window for WoW 7.3.5.
+## Author: s2k
+## Version: 1.18.2
+## SavedVariables: s2k_EnhancementsDB, s2k_NameplatesDB
+## OptionalDeps: WeakAuras, WeakAurasOptions, Dominos
+
+Libs/LibStub/LibStub.lua
+Libs/CallbackHandler-1.0/CallbackHandler-1.0.lua
+Libs/LibDataBroker-1.1/LibDataBroker-1.1.lua
+
+Core.lua
+Modules/ModuleManager.lua
+Modules/SavedSettings.lua
+Modules/Helpers.lua
+Modules/Profiler.lua
+Modules/Fonts.lua
+Modules/Textures.lua
+Modules/Frames.lua
+Modules/WeakAuraAnchors.lua
+Modules/BlizzardVisuals.lua
+Modules/Layout.lua
+Modules/Updates.lua
+Modules/OptionsApply.lua
+Modules/QuestReputation.lua
+Modules/WeakAurasIntegration.lua
+Modules/DominosIntegration.lua
+Modules/OptionsUI.lua
+Modules/Broker.lua
+Modules/Runtime.lua
+Modules/Events.lua
