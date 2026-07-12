@@ -2950,7 +2950,8 @@ function BuildOptionsPanel()
         AddControl(page, MakeCheckbox(content, "WeakAuraTargetEnabled", "Enable target nameplate aura", "Moves s2k_NP_Target onto the current target nameplate.", "weakAuraTargetEnabled", 16, y)); y = y - 38
         AddControl(page, MakeCheckbox(content, "WeakAuraFallbackEnabled", "Enable fallback aura", "When no target nameplate is available, moves s2k_NP_Target onto s2k_NP_Fallback. If disabled, no fallback anchoring is attempted.", "weakAuraFallbackEnabled", 16, y)); y = y - 38
         AddControl(page, MakeCheckbox(content, "WeakAuraManageBarGroups", "Enable top/bottom progress bar groups", "Creates and width-syncs only the fixed groups s2k_NP_BT and s2k_NP_BB. WeakAuras owns their layout/style settings, including group spacing; this addon only syncs width.", "weakAuraManageBarGroups", 16, y)); y = y - 38
-        AddControl(page, MakeCheckbox(content, "WeakAuraSmoothFollow", "Smooth WeakAuras follow", "Moves only the lightweight WA-safe target anchors every frame so attached WeakAuras follow camera/nameplate movement smoothly.", "weakAuraSmoothFollow", 16, y)); y = y - 46
+        AddControl(page, MakeCheckbox(content, "WeakAuraSmoothFollow", "Smooth WeakAuras follow", "Moves only the lightweight WA-safe target anchors every frame so attached WeakAuras follow camera/nameplate movement smoothly.", "weakAuraSmoothFollow", 16, y)); y = y - 38
+        AddControl(page, MakeDropdown(content, "WeakAuraAnchorEngine", "Anchor engine", "weakAuraAnchorEngine", WEAKAURA_ANCHOR_ENGINE_OPTIONS, 32, y, 260)); y = y - 70
 
         local note = content:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
         note:SetPoint("TOPLEFT", content, "TOPLEFT", 32, y)
@@ -3106,6 +3107,25 @@ function BuildOptionsPanel()
         AddControl(panel, MakeButton(content, "ProfilerPrint", "Print profiler report", 32, y, 180, function()
             ProfilerPrintReport()
         end)); y = y - 42
+
+        y = SectionTitle(content, "WeakAuras anchor stats", y)
+        local waStats = CreateFrame("CheckButton", content:GetName() .. "WeakAuraAnchorStatsEnabled", content, "InterfaceOptionsCheckButtonTemplate")
+        waStats:SetPoint("TOPLEFT", content, "TOPLEFT", 16, y)
+        local waStatsText = waStats.Text or _G[waStats:GetName() .. "Text"]
+        if waStatsText then waStatsText:SetText("Show WeakAuras anchor stats panel") end
+        waStats.tooltipText = "Show WeakAuras anchor stats panel"
+        waStats.tooltipRequirement = "Shows a small movable panel with anchor engine timing, update cadence and fallback/relink counters."
+        waStats:SetScript("OnClick", function(self)
+            SetWeakAuraAnchorStatsPanelEnabled(self:GetChecked() and true or false)
+        end)
+        waStats.Refresh = function(self)
+            self:SetChecked(CFG.debugWeakAuraAnchorStatsEnabled and true or false)
+        end
+        AddControl(panel, waStats); y = y - 42
+
+        AddControl(panel, MakeButton(content, "WeakAuraAnchorStatsReset", "Reset anchor stats", 32, y, 180, function()
+            ResetWeakAuraAnchorStats()
+        end)); y = y - 48
 
         y = SectionTitle(content, "CPU benchmark", y)
         AddControl(panel, MakeSlider(content, "BenchmarkSeconds", "Benchmark seconds", "debugBenchmarkSeconds", 5, 300, 5, 32, y)); y = y - 52

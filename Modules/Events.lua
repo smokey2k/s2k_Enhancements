@@ -202,6 +202,12 @@ function S2KNP_OnUpdate(self, elapsed)
         end
     end
 
+    if flags.weakAuraAnchorStats then
+        UpdateWeakAuraAnchorStatsPanel(elapsed)
+    end
+
+
+
     if flags.weakAuras then
         State.weakAuraSlowElapsed = State.weakAuraSlowElapsed + elapsed
         if State.weakAuraDirty or State.weakAuraSlowElapsed >= 0.20 then

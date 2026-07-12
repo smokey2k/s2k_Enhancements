@@ -212,12 +212,14 @@ function AnchorWeakAuraToTarget(region, ctx)
         return false
     end
 
-    -- Do not relayout the whole custom nameplate from the WeakAura path.
-    -- The normal nameplate runtime already keeps the custom frames positioned.
-    -- Here we only refresh the UIParent-safe dummy anchors and point the WA
-    -- region to those anchors. This avoids expensive aura/layout work every
-    -- frame and avoids anchoring the WA directly to a nameplate-child frame.
-    UpdateWAAnchors(ctx)
+    -- The selected anchor engine prepares addon-owned target anchors. The
+    -- absolute backend copies screen coordinates; the bridge backend points
+    -- those anchors to the custom s2k health/cast frames with SetPoint only.
+    local engine = GetWeakAuraAnchorEngine and GetWeakAuraAnchorEngine() or "absolute"
+    local forceAnchors = ctx.s2kWAAnchorRegion ~= region or ctx.s2kWAAnchorEngine ~= engine
+    UpdateWAAnchors(ctx, forceAnchors)
+    ctx.s2kWAAnchorRegion = region
+    ctx.s2kWAAnchorEngine = engine
 
     local healthAnchor = ctx.waHealthAnchor or ctx.health
     local bottomAnchor = healthAnchor
@@ -1163,19 +1165,25 @@ UpdateWeakAurasBinding = function()
         ok = AnchorWeakAuraToTarget(region, ctx)
     elseif CFG.weakAuraFallbackEnabled then
         mode = "fallback"
+        if State.weakAuraAnchorStats then
+            State.weakAuraAnchorStats.fallbacks = (State.weakAuraAnchorStats.fallbacks or 0) + 1
+        end
         ok = AnchorWeakAuraToFallback(region)
     end
 
     if ok then
+        local engine = GetWeakAuraAnchorEngine and GetWeakAuraAnchorEngine() or "absolute"
         local shouldUpdateGroups = State.weakAuraBarGroupsDirty
             or State.weakAuraLastMode ~= mode
             or State.weakAuraLastTargetRegion ~= region
+            or State.weakAuraLastAnchorEngine ~= engine
 
         if shouldUpdateGroups then
             UpdateWeakAuraBarGroups(region)
             State.weakAuraBarGroupsDirty = false
             State.weakAuraLastMode = mode
             State.weakAuraLastTargetRegion = region
+            State.weakAuraLastAnchorEngine = engine
         end
 
         return true

@@ -118,6 +118,19 @@ function NormalizeDominosSettingsOnDB()
     DB.dominosEditSession.active = DB.dominosEditSession.active and true or false
 end
 
+
+function NormalizeWeakAuraAnchorSettingsOnDB()
+    if type(DB) ~= "table" then
+        return
+    end
+
+    local engine = tostring(DB.weakAuraAnchorEngine or "absolute"):lower()
+    if engine ~= "absolute" and engine ~= "bridge" then
+        engine = "absolute"
+    end
+    DB.weakAuraAnchorEngine = engine
+    DB.debugWeakAuraAnchorStatsEnabled = DB.debugWeakAuraAnchorStatsEnabled and true or false
+end
 function CopyDefaults()
     if type(DB) ~= "table" then
         return
@@ -154,6 +167,7 @@ function CopyDefaults()
     end
 
     ApplyFixedWeakAuraNamesToDB()
+    NormalizeWeakAuraAnchorSettingsOnDB()
     NormalizeDominosSettingsOnDB()
 
     for k in pairs(DEFAULTS) do

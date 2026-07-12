@@ -1,3 +1,8 @@
+# s2k:Enhancements 1.18.4-wa-anchor-bridge
+
+- Added an experimental WeakAuras bridge anchor engine that attaches addon-owned UIParent anchors to the custom s2k target health/cast frames using SetPoint-only anchoring.
+- Kept the existing safe absolute WeakAuras anchor engine as the default and added an Addons > WeakAuras selector for switching between engines.
+- Added a Debug option and `/s2ke wastats` commands for a movable WeakAuras anchor stats panel showing update cadence, CPU timing, relinks and fallback counts.
 # s2k:Enhancements 1.18.3-weakauras-group-settings
 
 - Fixed s2k_NP_BT and s2k_NP_BB WeakAuras progress groups being repaired after changing their Group tab layout/style settings.
