@@ -2950,8 +2950,6 @@ function BuildOptionsPanel()
         AddControl(page, MakeCheckbox(content, "WeakAuraTargetEnabled", "Enable target nameplate aura", "Moves s2k_NP_Target onto the current target nameplate.", "weakAuraTargetEnabled", 16, y)); y = y - 38
         AddControl(page, MakeCheckbox(content, "WeakAuraFallbackEnabled", "Enable fallback aura", "When no target nameplate is available, moves s2k_NP_Target onto s2k_NP_Fallback. If disabled, no fallback anchoring is attempted.", "weakAuraFallbackEnabled", 16, y)); y = y - 38
         AddControl(page, MakeCheckbox(content, "WeakAuraManageBarGroups", "Enable top/bottom progress bar groups", "Creates and width-syncs only the fixed groups s2k_NP_BT and s2k_NP_BB. WeakAuras owns their layout/style settings, including group spacing; this addon only syncs width.", "weakAuraManageBarGroups", 16, y)); y = y - 38
-        AddControl(page, MakeCheckbox(content, "WeakAuraSmoothFollow", "Smooth WeakAuras follow", "Moves only the lightweight WA-safe target anchors every frame so attached WeakAuras follow camera/nameplate movement smoothly.", "weakAuraSmoothFollow", 16, y)); y = y - 38
-        AddControl(page, MakeDropdown(content, "WeakAuraAnchorEngine", "Anchor engine", "weakAuraAnchorEngine", WEAKAURA_ANCHOR_ENGINE_OPTIONS, 32, y, 260)); y = y - 70
 
         local note = content:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
         note:SetPoint("TOPLEFT", content, "TOPLEFT", 32, y)

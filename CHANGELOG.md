@@ -1,3 +1,8 @@
+# s2k:Enhancements 1.18.5-wa-bridge-anchor
+
+- Promoted the WeakAuras bridge anchor path to the only target nameplate anchor implementation.
+- Removed the legacy absolute WeakAuras anchor engine, the anchor-engine selector and the per-frame Smooth WeakAuras follow option.
+- Kept the movable WeakAuras anchor stats panel for bridge anchor timing and relink/fallback diagnostics.
 # s2k:Enhancements 1.18.4-wa-anchor-bridge
 
 - Added an experimental WeakAuras bridge anchor engine that attaches addon-owned UIParent anchors to the custom s2k target health/cast frames using SetPoint-only anchoring.

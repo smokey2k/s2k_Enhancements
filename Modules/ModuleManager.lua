@@ -114,11 +114,9 @@ function S2KNP_RebuildRuntimeFlags()
     flags.targetRuntimeHealth = enabled and CFG.moduleTargetRuntimeHealthEnabled ~= false
     flags.weakAurasModule = enabled and CFG.moduleWeakAurasEnabled ~= false
     flags.weakAuras = flags.weakAurasModule and CFG.weakAurasEnabled == true
-    flags.weakAuraSmoothFollow = flags.weakAuras and CFG.weakAuraSmoothFollow == true and CFG.weakAuraTargetEnabled ~= false
     flags.weakAuraAnchorStats = enabled and CFG.debugWeakAuraAnchorStatsEnabled == true
     flags.targetRuntime = flags.targetRuntimeHealth
         or flags.playerCastOverlay
-        or (flags.weakAuras and not CFG.weakAuraSmoothFollow)
     flags.castRuntime = flags.castbar
     flags.healthEvents = enabled
     flags.spellEvents = flags.castbar or flags.playerCastOverlay

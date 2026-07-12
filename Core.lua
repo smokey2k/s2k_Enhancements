@@ -1,7 +1,7 @@
 -- =========================================================
 -- s2k:Enhancements (s2k Enhancements)
 -- WoW 7.3.5
--- v1.18.4-wa-anchor-bridge
+-- v1.18.5-wa-bridge-anchor
 -- Note: top-level helper functions are intentionally non-local to stay under the Lua 5.1 chunk-local limit.
 --
 -- Custom Blizzard-nameplate driven skin system.
@@ -22,7 +22,7 @@ _G.s2k_Enhancements = _G.s2k_Enhancements or {}
 API = _G.s2k_Enhancements
 -- Backward-compatible API alias for integrations written for the old addon name.
 _G.s2k_Nameplates = API
-API.version = "1.18.4-wa-anchor-bridge"
+API.version = "1.18.5-wa-bridge-anchor"
 
 
 DEFAULTS = {
@@ -248,7 +248,6 @@ DEFAULTS = {
     weakAuraTargetId = "s2k_NP_Target",
     weakAuraFallbackEnabled = true,
     weakAuraFallbackId = "s2k_NP_Fallback",
-    weakAuraAnchorEngine = "absolute", -- absolute or bridge
 
     -- Optional PlateX progress/bar group width management.
     -- Progress bar groups are now dynamic. WeakAuras itself decides where each
@@ -262,10 +261,6 @@ DEFAULTS = {
     weakAuraTopGroupId = "s2k_NP_BT",
     weakAuraBottomGroupId = "s2k_NP_BB",
 
-    -- Keep the WA-safe dummy anchors glued to the moving target nameplate
-    -- every rendered frame. This is much cheaper than re-anchoring the full
-    -- WeakAura/bar groups every frame, but removes the visible camera-move lag.
-    weakAuraSmoothFollow = true,
 
 
     maxNameplates = 40,
@@ -314,7 +309,6 @@ State = {
     weakAuraSlowElapsed = 0,
     weakAuraLastMode = nil,
     weakAuraLastTargetRegion = nil,
-    weakAuraLastAnchorEngine = nil,
     weakAuraScaffoldDirty = true,
     weakAuraAnchorStats = {},
     weakAuraAnchorStatsPanel = nil,
@@ -377,9 +371,4 @@ BORDER_STYLE_OPTIONS = {
     { key = "THIN",  label = "Thin 1 px",  thickness = 1 },
     { key = "THICK", label = "Thick 2 px", thickness = 2 },
     { key = "HEAVY", label = "Heavy 3 px", thickness = 3 },
-}
-
-WEAKAURA_ANCHOR_ENGINE_OPTIONS = {
-    { key = "absolute", label = "Safe absolute anchors" },
-    { key = "bridge",   label = "Experimental bridge anchors" },
 }

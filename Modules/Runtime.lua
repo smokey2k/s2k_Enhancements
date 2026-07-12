@@ -61,9 +61,6 @@ function UpdateTargetRuntimeOnly()
         return nil
     end
 
-    if flags.weakAuras and not CFG.weakAuraSmoothFollow then
-        UpdateWAAnchors(ctx)
-    end
     if flags.targetRuntimeHealth then UpdateHealth(ctx) end
     if flags.playerCastOverlay then UpdatePlayerCastOverlay(ctx, true) end
     return ctx
@@ -88,14 +85,4 @@ end
 function UpdateTargetPlayerCastOverlayOnly()
     local ctx = GetTargetContextCached()
     if ctx then UpdatePlayerCastOverlay(ctx, true) end
-end
-
-function UpdateWeakAuraSmoothFollowOnly()
-    local flags = State.runtimeFlags
-    if not flags or not flags.weakAuraSmoothFollow then return end
-
-    local ctx = GetTargetContextCached()
-    if ctx and ctx.root and ctx.root:IsShown() then
-        UpdateWAAnchors(ctx)
-    end
 end

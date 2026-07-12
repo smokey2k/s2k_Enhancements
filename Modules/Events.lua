@@ -174,9 +174,6 @@ function S2KNP_OnUpdate(self, elapsed)
 
     local profileStart = State.profilerActive and debugprofilestop()
 
-    if flags.weakAuraSmoothFollow then
-        UpdateWeakAuraSmoothFollowOnly()
-    end
 
     if flags.targetRuntime then
         State.smoothElapsed = State.smoothElapsed + elapsed

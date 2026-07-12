@@ -123,9 +123,6 @@ end
 function ApplyOptionsNow()
     State.pendingOptionsApply = false
     SyncProfilerState()
-    if GetWeakAuraAnchorEngine and State.weakAuraLastAnchorEngine ~= GetWeakAuraAnchorEngine() and ResetWeakAuraAnchorEngine then
-        ResetWeakAuraAnchorEngine()
-    end
     ApplyNameplateCVarSettings()
     if S2KNP_ApplyModuleState then S2KNP_ApplyModuleState() end
     UpdateAll(true)

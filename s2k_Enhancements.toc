@@ -2,7 +2,7 @@
 ## Title: s2k:Enhancements
 ## Notes: s2k Enhancements - custom nameplates, quest enhancements, addon integrations and an LDB-accessible standalone configuration window for WoW 7.3.5.
 ## Author: s2k
-## Version: 1.18.4
+## Version: 1.18.5
 ## SavedVariables: s2k_EnhancementsDB, s2k_NameplatesDB
 ## OptionalDeps: WeakAuras, WeakAurasOptions, Dominos
 

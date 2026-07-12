@@ -17,7 +17,6 @@ S2KNP_PROFILE_FUNCTION_NAMES = S2KNP_PROFILE_FUNCTION_NAMES or {
     "UpdateTargetRuntimeOnly",
     "UpdateVisibleCastRuntimeOnly",
     "UpdateTargetPlayerCastOverlayOnly",
-    "UpdateWeakAuraSmoothFollowOnly",
     "UpdateWAAnchors",
     "UpdateWeakAuraBarGroups",
     "FlushDirtyAuras",
