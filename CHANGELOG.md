@@ -1,3 +1,9 @@
+# s2k:Enhancements 1.18.3-weakauras-group-settings
+
+- Fixed s2k_NP_BT and s2k_NP_BB WeakAuras progress groups being repaired after changing their Group tab layout/style settings.
+- Preserved existing progress-group Space, Grow, Align, Sort, animation, stagger, background and anchor-point settings across reloads.
+- The WeakAuras scaffold repair still keeps the fixed s2k_NP group structure compatible with WeakAuras 2.5.12 on Interface 70300.
+
 # s2k:Enhancements 1.18.2-spell-overlay-fix
 
 - Fixed Show spell activation overlays not staying unchecked on affected 7.3.5 clients.

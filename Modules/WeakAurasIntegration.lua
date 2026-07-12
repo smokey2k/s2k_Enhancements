@@ -761,53 +761,6 @@ function SanitizeKnownS2KWeakAuras(displays)
                     data.regionType = "dynamicgroup"
                     changed = true
                 end
-                local wantGrow = (id == FIXED_WA_BOTTOM_GROUP_ID) and "DOWN" or "UP"
-                local wantSelf = (id == FIXED_WA_BOTTOM_GROUP_ID) and "TOPLEFT" or "BOTTOMLEFT"
-                local wantAnchor = (id == FIXED_WA_BOTTOM_GROUP_ID) and "BOTTOMLEFT" or "TOPLEFT"
-                if data.grow ~= wantGrow then
-                    data.grow = wantGrow
-                    changed = true
-                end
-                if data.space ~= 1 then
-                    data.space = 1
-                    changed = true
-                end
-                if data.align ~= "LEFT" then
-                    data.align = "LEFT"
-                    changed = true
-                end
-                if data.sort ~= "none" then
-                    data.sort = "none"
-                    changed = true
-                end
-                if data.animate ~= true then
-                    data.animate = true
-                    changed = true
-                end
-                if data.stagger ~= 0 then
-                    data.stagger = 0
-                    changed = true
-                end
-                if data.constantFactor ~= "RADIUS" then
-                    data.constantFactor = "RADIUS"
-                    changed = true
-                end
-                if data.rotation ~= 0 then
-                    data.rotation = 0
-                    changed = true
-                end
-                if data.radius ~= 200 then
-                    data.radius = 200
-                    changed = true
-                end
-                if data.background ~= "None" then
-                    data.background = "None"
-                    changed = true
-                end
-                if data.backgroundInset ~= 0 then
-                    data.backgroundInset = 0
-                    changed = true
-                end
                 if data.anchorFrameType ~= "SELECTFRAME" then
                     data.anchorFrameType = "SELECTFRAME"
                     changed = true
@@ -815,14 +768,6 @@ function SanitizeKnownS2KWeakAuras(displays)
                 local wantFrame = "WeakAuras:" .. FIXED_WA_TARGET_ID
                 if data.anchorFrameFrame ~= wantFrame then
                     data.anchorFrameFrame = wantFrame
-                    changed = true
-                end
-                if data.selfPoint ~= wantSelf then
-                    data.selfPoint = wantSelf
-                    changed = true
-                end
-                if data.anchorPoint ~= wantAnchor then
-                    data.anchorPoint = wantAnchor
                     changed = true
                 end
             else
@@ -867,53 +812,6 @@ function SanitizeKnownS2KWeakAuras(displays)
                     data.regionType = "dynamicgroup"
                     changed = true
                 end
-                local wantGrow = (id == FIXED_WA_BOTTOM_GROUP_ID) and "DOWN" or "UP"
-                local wantSelf = (id == FIXED_WA_BOTTOM_GROUP_ID) and "TOPLEFT" or "BOTTOMLEFT"
-                local wantAnchor = (id == FIXED_WA_BOTTOM_GROUP_ID) and "BOTTOMLEFT" or "TOPLEFT"
-                if data.grow ~= wantGrow then
-                    data.grow = wantGrow
-                    changed = true
-                end
-                if data.space ~= 1 then
-                    data.space = 1
-                    changed = true
-                end
-                if data.align ~= "LEFT" then
-                    data.align = "LEFT"
-                    changed = true
-                end
-                if data.sort ~= "none" then
-                    data.sort = "none"
-                    changed = true
-                end
-                if data.animate ~= true then
-                    data.animate = true
-                    changed = true
-                end
-                if data.stagger ~= 0 then
-                    data.stagger = 0
-                    changed = true
-                end
-                if data.constantFactor ~= "RADIUS" then
-                    data.constantFactor = "RADIUS"
-                    changed = true
-                end
-                if data.rotation ~= 0 then
-                    data.rotation = 0
-                    changed = true
-                end
-                if data.radius ~= 200 then
-                    data.radius = 200
-                    changed = true
-                end
-                if data.background ~= "None" then
-                    data.background = "None"
-                    changed = true
-                end
-                if data.backgroundInset ~= 0 then
-                    data.backgroundInset = 0
-                    changed = true
-                end
                 if data.anchorFrameType ~= "SELECTFRAME" then
                     data.anchorFrameType = "SELECTFRAME"
                     changed = true
@@ -921,14 +819,6 @@ function SanitizeKnownS2KWeakAuras(displays)
                 local wantFrame = "WeakAuras:" .. FIXED_WA_TARGET_ID
                 if data.anchorFrameFrame ~= wantFrame then
                     data.anchorFrameFrame = wantFrame
-                    changed = true
-                end
-                if data.selfPoint ~= wantSelf then
-                    data.selfPoint = wantSelf
-                    changed = true
-                end
-                if data.anchorPoint ~= wantAnchor then
-                    data.anchorPoint = wantAnchor
                     changed = true
                 end
             else
