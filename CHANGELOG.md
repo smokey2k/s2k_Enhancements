@@ -1,3 +1,8 @@
+# s2k:Enhancements 1.18.6-ldb-dominos-click
+
+- Fixed Dominos/Editable right-click toggling from LDB display addons that pass the mouse button as the first OnClick argument.
+- The launcher now reports why Dominos layout switching is unavailable instead of silently doing nothing.
+
 # s2k:Enhancements 1.18.5-wa-bridge-anchor
 
 - Promoted the WeakAuras bridge anchor path to the only target nameplate anchor implementation.

@@ -449,7 +449,12 @@ function ToggleDominosLayoutMode(source, silent)
     local available, modeOrReason = CanToggleDominosLayoutFromLauncher()
     if not available then
         if not silent then
-            print("s2k:Enhancements: " .. tostring(modeOrReason or "Dominos layout switching is unavailable."))
+            local message = tostring(modeOrReason or "Dominos layout switching is unavailable.")
+            if S2KPrint then
+                S2KPrint(message)
+            else
+                print("s2k:Enhancements: " .. message)
+            end
         end
         return false
     end
@@ -468,7 +473,12 @@ function ToggleDominosLayoutMode(source, silent)
 
     if not silent then
         local suffix = (State and State.pendingDominosApply) and " (waiting for combat to end)" or ""
-        print("s2k:Enhancements Dominos layout: " .. GetDominosLayoutDisplayName(nextMode) .. suffix)
+        local message = "Dominos layout: " .. GetDominosLayoutDisplayName(nextMode) .. suffix
+        if S2KPrint then
+            S2KPrint(message)
+        else
+            print("s2k:Enhancements: " .. message)
+        end
     end
 
     return true, nextMode

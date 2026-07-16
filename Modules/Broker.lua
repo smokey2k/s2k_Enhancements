@@ -5,11 +5,28 @@
 local S2K_MINIMAP_DEFAULT_POSITION = 225
 local S2K_MINIMAP_ICON_PATH = "Interface\\Icons\\INV_Misc_Gear_01"
 
-function HandleS2KLauncherClick(_, mouseButton)
+local function GetS2KLauncherMouseButton(firstArg, secondArg)
+    if type(secondArg) == "string" then
+        return secondArg
+    end
+
+    -- LibDataBroker display addons are not perfectly consistent here: some
+    -- call OnClick(frame, button), while others pass only the button string.
+    if type(firstArg) == "string" then
+        return firstArg
+    end
+
+    return secondArg
+end
+
+function HandleS2KLauncherClick(firstArg, secondArg)
+    local mouseButton = GetS2KLauncherMouseButton(firstArg, secondArg)
+
     if mouseButton == "RightButton" then
-        local available = CanToggleDominosLayoutFromLauncher and CanToggleDominosLayoutFromLauncher()
-        if available and ToggleDominosLayoutMode then
+        if ToggleDominosLayoutMode then
             ToggleDominosLayoutMode("launcher")
+        elseif S2KPrint then
+            S2KPrint("Dominos layout switching is not available.")
         end
         return
     end
