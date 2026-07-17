@@ -3,7 +3,7 @@
 -- =========================================================
 
 local S2K_MINIMAP_DEFAULT_POSITION = 225
-local S2K_MINIMAP_ICON_PATH = "Interface\\Icons\\INV_Misc_Gear_01"
+local S2K_MINIMAP_ICON_PATH = "Interface\\Icons\\Ability_Racial_BearForm"
 
 local function GetS2KLauncherMouseButton(firstArg, secondArg)
     if type(secondArg) == "string" then

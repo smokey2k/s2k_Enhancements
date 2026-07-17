@@ -777,6 +777,29 @@ function SelectS2KConfigPanel(key, subPage)
     LayoutVisibleS2KConfigContent(true)
 end
 
+function InitializeS2KInterfaceOptionsPanel()
+    if State.interfaceOptionsPanel or not InterfaceOptions_AddCategory then
+        return State.interfaceOptionsPanel
+    end
+
+    local panel = CreateFrame("Frame", "s2k_EnhancementsInterfaceOptionsPanel", UIParent)
+    panel.name = "s2k:Enhancements"
+
+    local openButton = CreateFrame("Button", panel:GetName() .. "OpenButton", panel, "UIPanelButtonTemplate")
+    openButton:SetSize(180, 24)
+    openButton:SetPoint("TOPLEFT", panel, "TOPLEFT", 16, -16)
+    openButton:SetText("Open settings")
+    openButton:SetScript("OnClick", function()
+        if OpenS2KConfig then
+            OpenS2KConfig("general", "general")
+        end
+    end)
+
+    InterfaceOptions_AddCategory(panel)
+    State.interfaceOptionsPanel = panel
+    return panel
+end
+
 function OpenS2KConfig(panelKey, subPage)
     BuildOptionsPanel()
     local frame = EnsureS2KConfigWindow()

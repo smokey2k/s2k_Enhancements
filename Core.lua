@@ -1,7 +1,7 @@
 -- =========================================================
 -- s2k:Enhancements (s2k Enhancements)
 -- WoW 7.3.5
--- v1.18.6-ldb-dominos-click
+-- v1.18.7-interface-open-button
 -- Note: top-level helper functions are intentionally non-local to stay under the Lua 5.1 chunk-local limit.
 --
 -- Custom Blizzard-nameplate driven skin system.
@@ -22,7 +22,7 @@ _G.s2k_Enhancements = _G.s2k_Enhancements or {}
 API = _G.s2k_Enhancements
 -- Backward-compatible API alias for integrations written for the old addon name.
 _G.s2k_Nameplates = API
-API.version = "1.18.6-ldb-dominos-click"
+API.version = "1.18.7-interface-open-button"
 
 
 DEFAULTS = {
@@ -324,6 +324,7 @@ State = {
     dominosStatusText = nil,
     dominosStatusError = false,
     dominosOptionsPage = nil,
+    interfaceOptionsPanel = nil,
     cachedTargetContext = nil,
 
     profilerActive = false,

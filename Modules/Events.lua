@@ -34,6 +34,7 @@ function S2KNP_OnEvent(self, event, arg1)
             if ApplySpellActivationOverlaySetting then ApplySpellActivationOverlaySetting() end
             if InitializeS2KBroker then InitializeS2KBroker() end
             if InitializeS2KMinimapIcon then InitializeS2KMinimapIcon() end
+            if InitializeS2KInterfaceOptionsPanel then InitializeS2KInterfaceOptionsPanel() end
             RebuildFontOptions()
             RememberConfiguredFontPaths()
             SyncProfilerState()
@@ -65,6 +66,7 @@ function S2KNP_OnEvent(self, event, arg1)
         if ApplySpellActivationOverlaySetting then ApplySpellActivationOverlaySetting() end
         if InitializeS2KBroker then InitializeS2KBroker() end
         if InitializeS2KMinimapIcon then InitializeS2KMinimapIcon() end
+        if InitializeS2KInterfaceOptionsPanel then InitializeS2KInterfaceOptionsPanel() end
         if InitializeQuestReputation then InitializeQuestReputation() end
         RebuildFontOptions()
         RebuildStatusBarTextureOptions()

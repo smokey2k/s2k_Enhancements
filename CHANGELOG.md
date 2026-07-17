@@ -1,3 +1,8 @@
+# s2k:Enhancements 1.18.7-interface-open-button
+
+- Changed the LDB and minimap launcher icon to Ability_Racial_BearForm.
+- Added a minimal Blizzard Interface > AddOns entry containing only one button that opens the standalone settings window.
+
 # s2k:Enhancements 1.18.6-ldb-dominos-click
 
 - Fixed Dominos/Editable right-click toggling from LDB display addons that pass the mouse button as the first OnClick argument.

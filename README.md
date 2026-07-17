@@ -13,7 +13,7 @@ Az addon `s2k:Enhancements` néven regisztrál egy **LibDataBroker-1.1 launcher*
 - Az LDB blokkon vagy a minimap ikonon bal egérgombbal kattintva megnyitható és bezárható a konfiguráció.
 - A `/s2ke` parancs szintén megnyitja vagy bezárja az ablakot.
 - A `/s2ke config`, `/s2ke options` és `/s2ke settings` megnyitja a konfigurációt.
-- Az addon többé nem regisztrál beállítási kategóriákat a Blizzard Interface Options paneljén.
+- A Blizzard Interface > AddOns panelen csak egy megnyito gomb jelenik meg; a teljes beallitofelulet tovabbra is az addon sajat ablakaban van.
 
 A szükséges `LibStub`, `CallbackHandler-1.0` és `LibDataBroker-1.1` könyvtárak be vannak ágyazva az addonba, ezért nincs szükség külön telepített LDB könyvtár-addonra.
 
