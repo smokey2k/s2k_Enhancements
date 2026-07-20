@@ -25,6 +25,12 @@ DOMINOS_EDIT_DIRECTION_OPTIONS = {
     { key = "VERTICAL", label = "One below another" },
 }
 
+local DOMINOS_STRATA = {BACKGROUND=1,LOW=1,MEDIUM=1,HIGH=1,DIALOG=1,FULLSCREEN=1,FULLSCREEN_DIALOG=1,TOOLTIP=1}
+DOMINOS_FRAME_STRATA_OPTIONS = {
+    {key='BACKGROUND',label='Background'},{key='LOW',label='Low'},{key='MEDIUM',label='Medium'},{key='HIGH',label='High'},
+    {key='DIALOG',label='Dialog'},{key='FULLSCREEN',label='Fullscreen'},{key='FULLSCREEN_DIALOG',label='Fullscreen dialog'},{key='TOOLTIP',label='Tooltip'},
+}
+
 function GetDominosAddonObject()
     if _G.Dominos and type(_G.Dominos) == "table" then
         return _G.Dominos
@@ -175,6 +181,10 @@ function EnsureDominosSettingsTables(forceCountRefresh)
             DB.dominosBars[i] = settings
         end
         settings.anchored = settings.anchored and true or false
+        local strata = type(settings.frameStrata) == 'string' and settings.frameStrata:upper()
+        local frame = GetDominosActionBarFrame(i)
+        strata = DOMINOS_STRATA[strata] and strata or (frame and frame:GetFrameStrata()) or 'MEDIUM'
+        settings.frameStrata = DOMINOS_STRATA[strata] and strata or 'MEDIUM'
     end
 
     -- Remove fields created by the abandoned 1.17.0 show-state editor once.
@@ -243,6 +253,24 @@ function GetDominosBarSettings(index)
         return nil
     end
     return CFG.dominosBars[index]
+end
+
+local function EnforceDominosStrata(index)
+    if not CFG or not CFG.dominosIntegrationEnabled then return end
+    if IsInCombat and IsInCombat() then State.pendingDominosApply = true; return end
+    local bar, frame = GetDominosBarSettings(index), GetDominosActionBarFrame(index)
+    if bar and frame and frame:GetFrameStrata() ~= bar.frameStrata then frame:SetFrameStrata(bar.frameStrata) end
+end
+
+function ApplyDominosStrata()
+    for i=1,EnsureDominosSettingsTables() do
+        local index, frame = i, GetDominosActionBarFrame(i)
+        if frame and not frame.s2kStrataHooked then
+            frame.s2kStrataHooked=true
+            hooksecurefunc(frame, 'SetFrameStrata', function() EnforceDominosStrata(index) end)
+        end
+        EnforceDominosStrata(i)
+    end
 end
 
 function GetDominosFrameShowStates(frame)
@@ -959,6 +987,8 @@ function ApplyDominosIntegration(force)
         return true
     end
 
+    ApplyDominosStrata()
+
     local mode = tostring(CFG.dominosLayoutMode or "LOCKED"):upper()
     if mode == "EDITABLE" then
         local ok, result = ApplyDominosEditableMode()
@@ -1021,5 +1051,14 @@ function SetDominosBarAnchored(index, enabled)
 
     CFG.dominosBars[index].anchored = enabled and true or false
     DB.dominosBars[index].anchored = CFG.dominosBars[index].anchored
+    RequestDominosApply()
+end
+
+function SetDominosBarFrameStrata(index, strata)
+    EnsureDominosSettingsTables()
+    index, strata = tonumber(index), tostring(strata):upper()
+    if not index or not CFG.dominosBars[index] or not DOMINOS_STRATA[strata] then return end
+    CFG.dominosBars[index].frameStrata = strata
+    DB.dominosBars[index].frameStrata = strata
     RequestDominosApply()
 end

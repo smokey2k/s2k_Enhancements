@@ -605,7 +605,9 @@ function EnsureS2KConfigWindow()
 
     local version = titleBar:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
     version:SetPoint("LEFT", title, "RIGHT", 10, -1)
-    version:SetText("v" .. tostring(API and API.version or ""))
+    local displayVersion = tostring(API and API.version or "")
+    displayVersion = displayVersion:match("^%d+[%d%.]*") or displayVersion
+    version:SetText("v" .. displayVersion)
 
     local close = CreateFrame("Button", "s2k_EnhancementsConfigCloseButton", frame, "UIPanelCloseButton")
     close:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -7, -7)
@@ -639,7 +641,7 @@ function EnsureS2KConfigWindow()
     end)
     resizeGrip:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOPLEFT")
-        GameTooltip:SetText("Drag to resize", 1, 1, 1)
+        GameTooltip:SetText(S2K_L("Drag to resize"), 1, 1, 1)
         GameTooltip:Show()
     end)
     resizeGrip:SetScript("OnLeave", function()
@@ -688,7 +690,7 @@ function EnsureS2KConfigWindow()
 
     local footer = frame:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
     footer:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 24, 21)
-    footer:SetText("Settings are applied immediately. Open this window from an LDB display or with /s2ke.")
+    footer:SetText(S2K_L("Settings are applied immediately. Open this window from an LDB display or with /s2ke."))
 
     State.configFrame = frame
     State.configNav = nav
@@ -718,6 +720,7 @@ function EnsureS2KConfigWindow()
 end
 
 function RegisterS2KConfigPanel(key, label, panel, order)
+    label = S2K_L(label)
     EnsureS2KConfigWindow()
     if not key or not panel then return end
 
@@ -788,7 +791,7 @@ function InitializeS2KInterfaceOptionsPanel()
     local openButton = CreateFrame("Button", panel:GetName() .. "OpenButton", panel, "UIPanelButtonTemplate")
     openButton:SetSize(180, 24)
     openButton:SetPoint("TOPLEFT", panel, "TOPLEFT", 16, -16)
-    openButton:SetText("Open settings")
+    openButton:SetText(S2K_L("Open settings"))
     openButton:SetScript("OnClick", function()
         if OpenS2KConfig then
             OpenS2KConfig("general", "general")
@@ -1003,7 +1006,7 @@ function MakeDropdown(parent, suffix, label, key, optionsOrGetter, x, y, width)
 
     local labelText = parent:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
     labelText:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y)
-    labelText:SetText(label)
+    labelText:SetText(S2K_L(label))
 
     local button = CreateFrame("Button", name .. "Button", parent, "UIPanelButtonTemplate")
     button:SetPoint("TOPLEFT", labelText, "BOTTOMLEFT", 0, -4)
@@ -1037,10 +1040,10 @@ function MakeDropdown(parent, suffix, label, key, optionsOrGetter, x, y, width)
 
     local function GetLabel(value)
         for _, opt in ipairs(GetOptions()) do
-            if tostring(opt.key) == tostring(value) then return opt.label end
+            if tostring(opt.key) == tostring(value) then return S2K_L(opt.label) end
         end
         local opts = GetOptions()
-        return opts[1] and opts[1].label or tostring(value or "")
+        return opts[1] and S2K_L(opts[1].label) or tostring(value or "")
     end
 
     local function SetText(value)
@@ -1070,7 +1073,9 @@ function MakeDropdown(parent, suffix, label, key, optionsOrGetter, x, y, width)
         SetText(optionKey)
         ClosePopup()
 
-        if key == "hpRatioFontKey" or key == "hpRatioFontOutlineKey" or key == "nameFontKey" or key == "nameFontOutlineKey" or key == "levelOverlayFontKey" or key == "levelOverlayFontOutlineKey" then
+        if key == "addonLocale" then
+            if ReloadUI then ReloadUI() end
+        elseif key == "hpRatioFontKey" or key == "hpRatioFontOutlineKey" or key == "nameFontKey" or key == "nameFontOutlineKey" or key == "levelOverlayFontKey" or key == "levelOverlayFontOutlineKey" then
             RequestTextFontRefresh()
         elseif key == "healthTextureKey" or key == "castbarTextureKey" or key == "playerCastOverlaySparkTextureKey" then
             RequestStatusBarTextureRefresh()
@@ -1120,7 +1125,7 @@ function MakeDropdown(parent, suffix, label, key, optionsOrGetter, x, y, width)
                 row:SetPoint("TOPLEFT", content, "TOPLEFT", 0, -((i - 1) * rowHeight))
                 row:SetPoint("RIGHT", content, "RIGHT", 0, 0)
                 local prefix = (tostring(CFG[key]) == tostring(opt.key)) and "|cffFFD200• |r" or "  "
-                row.text:SetText(prefix .. tostring(opt.label or opt.key or ""))
+                row.text:SetText(prefix .. S2K_L(tostring(opt.label or opt.key or "")))
                 row.optionKey = opt.key
                 row.optionPath = opt.path
                 row:SetScript("OnClick", function(self)
@@ -1218,6 +1223,7 @@ DEBUFF_ANCHOR_OPTIONS = {
 
 function CreateOptionsScrollPanel(frameName, displayName, parentCategoryName)
     EnsureS2KConfigWindow()
+    displayName = S2K_L(displayName)
     local panel = CreateFrame("Frame", frameName, State.configContentHost)
     panel.name = displayName
     if parentCategoryName then
@@ -1266,6 +1272,7 @@ end
 -- organization while removing the Blizzard Interface Options dependency.
 function CreateInternalTabbedOptionsPanel(frameName, displayName, parentCategoryName, tabs)
     EnsureS2KConfigWindow()
+    displayName = S2K_L(displayName)
     local panel = CreateFrame("Frame", frameName, State.configContentHost)
     panel.name = displayName
     if parentCategoryName then
@@ -1286,7 +1293,7 @@ function CreateInternalTabbedOptionsPanel(frameName, displayName, parentCategory
         local button = CreateFrame("Button", frameName .. "Tab" .. index, panel, "UIPanelButtonTemplate")
         button:SetSize(108, 22)
         button:SetPoint("TOPLEFT", panel, "TOPLEFT", 16, -44)
-        button:SetText(tab.label or tab.key)
+        button:SetText(S2K_L(tab.label or tab.key))
         button.s2kTabKey = tab.key
         button:SetScript("OnClick", function(self)
             panel:SelectS2KTab(self.s2kTabKey)
@@ -1400,12 +1407,32 @@ function AddControl(panel, control)
 end
 
 function SectionTitle(content, text, y)
-    local title = content:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
-    title:SetPoint("TOPLEFT", 16, y)
-    title:SetText(text)
-    return y - 34
+    local previous = content.s2kCurrentSectionFrame
+    if previous then
+        previous:ClearAllPoints()
+        previous:SetPoint('TOPLEFT', content, 'TOPLEFT', 8, previous.s2kTop)
+        previous:SetPoint('TOPRIGHT', content, 'TOPRIGHT', -12, previous.s2kTop)
+        previous:SetHeight(math.max(48, previous.s2kTitleY - y - 10))
+    end
+    local section = CreateFrame('Frame', nil, content)
+    section.s2kTitleY, section.s2kTop = y, y + 3
+    section:SetPoint('TOPLEFT', content, 'TOPLEFT', 8, section.s2kTop)
+    section:SetPoint('TOPRIGHT', content, 'TOPRIGHT', -12, section.s2kTop)
+    section:SetPoint('BOTTOM', content, 'BOTTOM', 0, 16)
+    section:EnableMouse(false)
+    section:SetBackdrop({bgFile='Interface\\Tooltips\\UI-Tooltip-Background', edgeFile='Interface\\Tooltips\\UI-Tooltip-Border', tile=true, tileSize=16, edgeSize=12, insets={left=3,right=3,top=3,bottom=3}})
+    section:SetBackdropColor(0.03, 0.03, 0.03, 0.32)
+    section:SetBackdropBorderColor(0.58, 0.58, 0.58, 0.82)
+    local title = section:CreateFontString(nil, 'OVERLAY', 'GameFontNormalLarge')
+    title:SetPoint('TOPLEFT', section, 'TOPLEFT', 12, 5)
+    title:SetText(S2K_L(text))
+    local titleBackground = section:CreateTexture(nil, 'ARTWORK')
+    titleBackground:SetTexture(0.03, 0.03, 0.03, 0.96)
+    titleBackground:SetPoint('CENTER', title, 'CENTER', 0, 0)
+    titleBackground:SetSize(math.max(24, title:GetStringWidth() + 16), 22)
+    content.s2kCurrentSectionFrame = section
+    return y - 40
 end
-
 
 function RefreshAllOptionsPanels()
     local old = State.optionsRefreshing
@@ -1684,7 +1711,7 @@ function MakeButton(parent, suffix, label, x, y, width, onClick)
     local button = CreateFrame("Button", parent:GetName() .. suffix, parent, "UIPanelButtonTemplate")
     button:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y)
     button:SetSize(width or 160, 24)
-    button:SetText(label)
+    button:SetText(S2K_L(label))
     button:SetScript("OnClick", function()
         if type(onClick) == "function" then
             onClick(button)
@@ -1718,6 +1745,7 @@ function RequestColorRefresh()
     end
 
     UpdateAll(true)
+    if ApplyChatSettings then ApplyChatSettings() end
 end
 
 function MakeColorButton(parent, suffix, label, prefix, x, y, width)
@@ -1725,12 +1753,12 @@ function MakeColorButton(parent, suffix, label, prefix, x, y, width)
 
     local labelText = parent:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
     labelText:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y)
-    labelText:SetText(label)
+    labelText:SetText(S2K_L(label))
 
     local button = CreateFrame("Button", name .. "Button", parent, "UIPanelButtonTemplate")
     button:SetPoint("TOPLEFT", labelText, "BOTTOMLEFT", 0, -4)
     button:SetSize(width or 180, 22)
-    button:SetText("Choose color")
+    button:SetText(S2K_L("Choose color"))
 
     -- Keep the color preview OUTSIDE the button. If the swatch is a child of the
     -- button, the selected color sits on top of the button text/skin in the old
@@ -1861,9 +1889,9 @@ function MakeCheckbox(parent, suffix, label, tip, key, x, y)
     local cb = CreateFrame("CheckButton", parent:GetName() .. suffix, parent, "InterfaceOptionsCheckButtonTemplate")
     cb:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y)
     local text = cb.Text or _G[cb:GetName() .. "Text"]
-    if text then text:SetText(label) end
-    cb.tooltipText = label
-    cb.tooltipRequirement = tip
+    if text then text:SetText(S2K_L(label)) end
+    cb.tooltipText = S2K_L(label)
+    cb.tooltipRequirement = S2K_L(tip)
     cb:SetScript("OnClick", function(self)
         local oldValue = CFG[key] and true or false
         local newValue = self:GetChecked() and true or false
@@ -1914,7 +1942,7 @@ function MakeSlider(parent, suffix, label, key, minValue, maxValue, step, x, y)
         local st = step or 1
         return math.floor((tonumber(v) or 0) / st + 0.5) * st
     end
-    local function SetLabel(v) _G[name .. "Text"]:SetText(label .. ": " .. tostring(v)) end
+    local function SetLabel(v) _G[name .. "Text"]:SetText(S2K_L(label) .. ": " .. tostring(v)) end
     s:SetScript("OnValueChanged", function(self, value)
         value = Round(value)
         SetLabel(value)
@@ -1948,7 +1976,7 @@ function MakeProfileNameEditBox(parent, suffix, label, x, y, width)
 
     local labelText = parent:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
     labelText:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y)
-    labelText:SetText(label)
+    labelText:SetText(S2K_L(label))
 
     local box = CreateFrame("EditBox", name .. "EditBox", parent, "InputBoxTemplate")
     box:SetPoint("TOPLEFT", labelText, "BOTTOMLEFT", 6, -6)
@@ -2051,7 +2079,7 @@ function MakeProfileActionDropdown(parent, suffix, label, x, y, width, action)
 
     local labelText = parent:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
     labelText:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y)
-    labelText:SetText(label)
+    labelText:SetText(S2K_L(label))
 
     local button = CreateFrame("Button", name .. "Button", parent, "UIPanelButtonTemplate")
     button:SetPoint("TOPLEFT", labelText, "BOTTOMLEFT", 0, -4)
@@ -2160,7 +2188,7 @@ function MakeProfileActionDropdown(parent, suffix, label, x, y, width, action)
                 row:SetPoint("TOPLEFT", content, "TOPLEFT", 0, -((i - 1) * rowHeight))
                 row:SetPoint("RIGHT", content, "RIGHT", 0, 0)
                 local prefix = (optKey == tostring(selected)) and "|cffFFD200• |r" or "  "
-                row.text:SetText(prefix .. tostring(opt.label or optKey))
+                row.text:SetText(prefix .. S2K_L(tostring(opt.label or optKey)))
                 row.optionKey = optKey
                 row:SetScript("OnClick", function(self)
                     SelectProfile(self.optionKey)
@@ -2248,6 +2276,9 @@ function MakeDominosBarEditor(parent, page, suffix, x, y, width)
     header.action:SetText("Action bar")
     header.anchored:SetText("Anchored")
 
+    header.strata = header:CreateFontString(nil, 'ARTWORK', 'GameFontNormalSmall')
+    header.strata:SetText('Frame strata')
+
     local function CreateRow(index)
         local row = CreateFrame("Frame", name .. "Row" .. tostring(index), editor)
         row.index = index
@@ -2266,11 +2297,26 @@ function MakeDominosBarEditor(parent, page, suffix, x, y, width)
             editor:Refresh()
         end)
 
+        row.strata = CreateFrame('Frame', name .. 'Strata' .. index, row, 'UIDropDownMenuTemplate')
+        UIDropDownMenu_SetWidth(row.strata, 145)
+        UIDropDownMenu_Initialize(row.strata, function()
+            for _, option in ipairs(DOMINOS_FRAME_STRATA_OPTIONS) do
+                local optionKey = option.key
+                local info = UIDropDownMenu_CreateInfo()
+                info.text, info.value = option.label, optionKey
+                info.checked = GetDominosBarSettings(index).frameStrata == optionKey
+                info.func = function() SetDominosBarFrameStrata(index, optionKey); CloseDropDownMenus(); editor:Refresh() end
+                UIDropDownMenu_AddButton(info)
+            end
+        end)
+
         row.Refresh = function(self)
             local bar = GetDominosBarSettings(index)
             local old = State.optionsRefreshing
             State.optionsRefreshing = true
             self.anchored:SetChecked(bar and bar.anchored and true or false)
+            UIDropDownMenu_SetSelectedValue(self.strata, bar.frameStrata)
+            UIDropDownMenu_SetText(self.strata, bar.frameStrata)
             State.optionsRefreshing = old
         end
 
@@ -2317,6 +2363,10 @@ function MakeDominosBarEditor(parent, page, suffix, x, y, width)
         header.action:SetWidth(math.max(120, editorWidth - 120))
         header.anchored:SetPoint("RIGHT", header, "RIGHT", -18, 0)
         header.anchored:SetWidth(90)
+        header.action:ClearAllPoints(); header.anchored:ClearAllPoints(); header.strata:ClearAllPoints()
+        header.anchored:SetPoint('LEFT', header, 'LEFT', 0, 0); header.anchored:SetWidth(72)
+        header.action:SetPoint('LEFT', header, 'LEFT', 76, 0); header.action:SetWidth(math.max(120, editorWidth - 300))
+        header.strata:SetPoint('RIGHT', header, 'RIGHT', -55, 0); header.strata:SetWidth(145)
 
         for i = 1, self.activeRowCount do
             local row = self.rows[i]
@@ -2330,6 +2380,10 @@ function MakeDominosBarEditor(parent, page, suffix, x, y, width)
             row.label:SetPoint("LEFT", row, "LEFT", 0, 0)
             row.label:SetWidth(math.max(120, editorWidth - 120))
             row.anchored:SetPoint("RIGHT", row, "RIGHT", -48, 0)
+            row.label:ClearAllPoints(); row.anchored:ClearAllPoints(); row.strata:ClearAllPoints()
+            row.anchored:SetPoint('LEFT', row, 'LEFT', 18, 0)
+            row.label:SetPoint('LEFT', row, 'LEFT', 76, 0); row.label:SetWidth(math.max(120, editorWidth - 300))
+            row.strata:SetPoint('RIGHT', row, 'RIGHT', 0, 0)
         end
 
         local newHeight = 34 + (self.activeRowCount * rowHeight)
@@ -2409,14 +2463,17 @@ function BuildOptionsPanel()
     -- General / General
     do
         local page, content = CreateOptionsSubPage(generalPanel, "s2k_EnhancementsOptionsGeneralPage", "general")
-        local y = SectionTitle(content, "Minimap", -16)
+        local y = SectionTitle(content, "Language", -16)
+        AddControl(page, MakeDropdown(content, "AddonLocale", "Addon display language", "addonLocale", S2K_ADDON_LOCALE_OPTIONS, 32, y, 220)); y = y - 70
+
+        y = SectionTitle(content, "Minimap", y)
 
         local cb = CreateFrame("CheckButton", content:GetName() .. "ShowMinimapIcon", content, "InterfaceOptionsCheckButtonTemplate")
         cb:SetPoint("TOPLEFT", content, "TOPLEFT", 16, y)
         local text = cb.Text or _G[cb:GetName() .. "Text"]
-        if text then text:SetText("Show minimap icon") end
-        cb.tooltipText = "Show minimap icon"
-        cb.tooltipRequirement = "Shows or hides the s2k:Enhancements launcher around the minimap. The LibDataBroker launcher remains available in LDB display addons such as StatBlockCore."
+        if text then text:SetText(S2K_L("Show minimap icon")) end
+        cb.tooltipText = S2K_L("Show minimap icon")
+        cb.tooltipRequirement = S2K_L("Shows or hides the s2k:Enhancements launcher around the minimap. The LibDataBroker launcher remains available in LDB display addons such as StatBlockCore.")
         cb:SetScript("OnClick", function(self)
             if SetS2KMinimapIconShown then
                 SetS2KMinimapIconShown(self:GetChecked() and true or false)
@@ -2436,7 +2493,7 @@ function BuildOptionsPanel()
         note:SetPoint("TOPLEFT", content, "TOPLEFT", 32, y)
         note:SetWidth(560)
         note:SetJustifyH("LEFT")
-        note:SetText("The minimap icon opens the same standalone configuration window as the LibDataBroker launcher. Drag the icon around the minimap to change its position.")
+        note:SetText(S2K_L("The minimap icon opens the same standalone configuration window as the LibDataBroker launcher. Drag the icon around the minimap to change its position."))
         y = y - 60
 
         y = SectionTitle(content, "Spell activation overlays", y)
@@ -2466,7 +2523,7 @@ function BuildOptionsPanel()
         spellOverlayNote:SetPoint("TOPLEFT", content, "TOPLEFT", 32, y)
         spellOverlayNote:SetWidth(560)
         spellOverlayNote:SetJustifyH("LEFT")
-        spellOverlayNote:SetText("Controls Blizzard's spell activation/proc overlay effects. The choice is saved globally and reapplied when the UI loads.")
+        spellOverlayNote:SetText(S2K_L("Controls Blizzard's spell activation/proc overlay effects. The choice is saved globally and reapplied when the UI loads."))
         y = y - 54
 
         y = SectionTitle(content, "Quest reputation rewards", y)
@@ -2485,7 +2542,7 @@ function BuildOptionsPanel()
         questNote:SetPoint("TOPLEFT", content, "TOPLEFT", 32, y)
         questNote:SetWidth(560)
         questNote:SetJustifyH("LEFT")
-        questNote:SetText("Shows the rewarded faction and reputation amount, including known Human, commendation and supported reputation-buff bonuses.")
+        questNote:SetText(S2K_L("Shows the rewarded faction and reputation amount, including known Human, commendation and supported reputation-buff bonuses."))
         y = y - 54
 
         content:SetHeight(math.abs(y) + 80)
@@ -2526,7 +2583,7 @@ function BuildOptionsPanel()
         profileNote:SetPoint("TOPLEFT", content, "TOPLEFT", 32, y)
         profileNote:SetWidth(560)
         profileNote:SetJustifyH("LEFT")
-        profileNote:SetText("Tip: Save current as profile only creates a snapshot. Load profile switches active profile. Copy into current has two steps: choose a source profile, then press Copy selected into current. It copies FROM the selected source INTO the active profile and keeps the active profile name unchanged.")
+        profileNote:SetText(S2K_L("Tip: Save current as profile only creates a snapshot. Load profile switches active profile. Copy into current has two steps: choose a source profile, then press Copy selected into current. It copies FROM the selected source INTO the active profile and keeps the active profile name unchanged."))
         y = y - 70
         content:SetHeight(math.abs(y) + 80)
     end
@@ -2593,7 +2650,7 @@ function BuildOptionsPanel()
         masterStatus:SetJustifyH("LEFT")
         masterStatus.Refresh = function(self)
             if CFG and CFG.enabled == false then
-                self:SetText("|cffff6060Custom Nameplates is currently disabled.|r")
+                self:SetText(S2K_L("|cffff6060Custom Nameplates is currently disabled.|r"))
                 self:Show()
             else
                 self:SetText("")
@@ -2609,7 +2666,7 @@ function BuildOptionsPanel()
         cmd:SetPoint("TOPLEFT", content, "TOPLEFT", 32, y)
         cmd:SetWidth(580)
         cmd:SetJustifyH("LEFT")
-        cmd:SetText("Slash commands: /s2kemod list, /s2kemod off customnameplates, /s2kemod on customnameplates")
+        cmd:SetText(S2K_L("Slash commands: /s2kemod list, /s2kemod off customnameplates, /s2kemod on customnameplates"))
         y = y - 50
 
         y = SectionTitle(content, "Blizzard nameplate visuals", y)
@@ -2788,6 +2845,49 @@ function BuildOptionsPanel()
     nameplatesPanel:SelectS2KTab("general")
     RefreshNameplatesOptionsAvailability()
 
+    -- Chat
+    do
+        local panel, content = CreateOptionsScrollPanel("s2k_EnhancementsOptionsChat", "Chat", "s2k:Enhancements")
+        local y = SectionTitle(content, "Chat module", -16)
+        AddControl(panel, MakeCheckbox(content, "ChatEnabled", "Enable Chat module", "Enables all chat enhancements on every Blizzard chat window. Disabled by default.", "chatEnabled", 16, y)); y = y - 38
+        AddControl(panel, MakeCheckbox(content, "ChatAltInvite", "Alt + left-click invites player", "Alt + left-click a player link in chat to invite that player to your group.", "chatAltInviteEnabled", 32, y)); y = y - 34
+        AddControl(panel, MakeCheckbox(content, "ChatCopy", "Shift + Left-click on chat tab opens Chat Copy window", "Opens a movable, resizable window containing every message currently retained by the clicked chat tab.", "chatCopyEnabled", 32, y)); y = y - 52
+        AddControl(panel, MakeDropdown(content, "ChatTextAlign", "Chat alignment", "chatTextAlign", CHAT_ALIGN_OPTIONS, 32, y, 220)); y = y - 62
+
+        y = SectionTitle(content, "Edit box", y)
+        AddControl(panel, MakeDropdown(content, "ChatEditBoxPosition", "Edit box position", "chatEditBoxPosition", CHAT_POSITION_OPTIONS, 32, y, 220)); y = y - 62
+        AddControl(panel, MakeSlider(content, "ChatEditBoxOffset", "Edit box distance offset", "chatEditBoxOffset", -40, 40, 1, 32, y)); y = y - 52
+        AddControl(panel, MakeSlider(content, "ChatEditBoxHorizontalOffset", "Edit box horizontal start offset", "chatEditBoxHorizontalOffset", -800, 800, 1, 32, y)); y = y - 52
+        AddControl(panel, MakeSlider(content, "ChatEditBoxWidth", "Edit box width (0 = automatic)", "chatEditBoxWidth", 0, 1600, 1, 32, y)); y = y - 52
+        AddControl(panel, MakeDropdown(content, "ChatEditBoxBorderStyle", "Edit box border", "chatEditBoxBorderStyle", CHAT_EDITBOX_BORDER_OPTIONS, 32, y, 220)); y = y - 62
+        AddControl(panel, MakeColorButton(content, "ChatEditBoxBackgroundColor", "Edit box background color / alpha", "chatEditBoxBackgroundColor", 32, y, 220)); y = y - 70
+        AddControl(panel, MakeSlider(content, "ChatEditBoxBorderThickness", "Edit box border thickness", "chatEditBoxBorderThickness", 1, 16, 1, 32, y)); y = y - 56
+        AddControl(panel, MakeSlider(content, "ChatEditBoxBorderInset", "Edit box border inset", "chatEditBoxBorderInset", -16, 16, 1, 32, y)); y = y - 52
+        AddControl(panel, MakeSlider(content, "ChatEditBoxBackgroundInset", "Edit box background inset", "chatEditBoxBackgroundInset", -16, 16, 1, 32, y)); y = y - 56
+
+        y = SectionTitle(content, "Fonts", y)
+        AddControl(panel, MakeDropdown(content, "ChatFont", "Chat font", "chatFontKey", GetFontOptions, 32, y, 240)); y = y - 62
+        AddControl(panel, MakeDropdown(content, "ChatFontOutline", "Chat font style", "chatFontOutlineKey", FONT_OUTLINE_OPTIONS, 32, y, 240)); y = y - 62
+
+        y = SectionTitle(content, "Side buttons", y)
+        AddControl(panel, MakeDropdown(content, "ChatButtonAlign", "Side button alignment", "chatButtonAlign", CHAT_ALIGN_OPTIONS, 32, y, 220)); y = y - 62
+        AddControl(panel, MakeCheckbox(content, "ChatQuickJoinButtonEnabled", "Show QuickJoinToastButton", "Shows the Blizzard Quick Join toast button.", "chatQuickJoinButtonEnabled", 32, y)); y = y - 34
+        AddControl(panel, MakeCheckbox(content, "ChatQuickJoinLDBEnabled", "Enable Quick Join LDB launcher", "Publishes a Quick Join launcher with the Blizzard button icon for LDB display addons.", "chatQuickJoinLDBEnabled", 48, y)); y = y - 38
+        AddControl(panel, MakeCheckbox(content, "ChatMenuButtonEnabled", "Show ChatFrameMenuButton", "Shows the Blizzard chat menu button.", "chatMenuButtonEnabled", 32, y)); y = y - 34
+        AddControl(panel, MakeCheckbox(content, "ChatMenuLDBEnabled", "Enable Chat Menu LDB launcher", "Publishes a Chat Menu launcher with the Blizzard button icon for LDB display addons.", "chatMenuLDBEnabled", 48, y)); y = y - 38
+        AddControl(panel, MakeCheckbox(content, "ChatButtonFrameEnabled", "Show ButtonFrame buttons", "Shows the Up, Down and Bottom buttons for every chat frame.", "chatButtonFrameEnabled", 32, y)); y = y - 34
+        AddControl(panel, MakeCheckbox(content, "ChatButtonFrameSmart", "Smart ButtonFrame buttons", "Shows Up/Down only while the pointer is over the complete chat interface, and Bottom only while hovering after scrolling upward. Requires ButtonFrame buttons to be enabled.", "chatButtonFrameSmart", 48, y)); y = y - 50
+        y = y - 12
+
+        local note = content:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+        note:SetPoint("TOPLEFT", content, "TOPLEFT", 32, y)
+        note:SetWidth(590)
+        note:SetJustifyH("LEFT")
+        note:SetText(S2K_L("In Chat Copy, select text and press Ctrl+C."))
+        content:SetHeight(math.abs(y) + 110)
+        RegisterS2KConfigPanel("chat", "Chat", panel, 3)
+    end
+
     -- Addons
     -- Keep every supported integration visible even when its dependency is not
     -- installed. Missing integrations are dimmed/disabled, while the persistent
@@ -2809,7 +2909,7 @@ function BuildOptionsPanel()
     -- four entries, the status block becomes independently scrollable.
     addonsPanel.s2kPageExtraTop = 42
     State.addonsOptionsPanel = addonsPanel
-    RegisterS2KConfigPanel("addons", "Addons", addonsPanel, 3)
+    RegisterS2KConfigPanel("addons", "Addons", addonsPanel, 4)
 
     local compatibilityScroll = CreateFrame("ScrollFrame", "s2k_EnhancementsCompatibilityScrollFrame", addonsPanel, "UIPanelScrollFrameTemplate")
     compatibilityScroll:SetPoint("TOPLEFT", addonsPanel, "TOPLEFT", 20, -78)
@@ -2984,7 +3084,7 @@ function BuildOptionsPanel()
         local repair = CreateFrame("Button", content:GetName() .. "CreateFixedWeakAurasButton", content, "UIPanelButtonTemplate")
         repair:SetPoint("TOPLEFT", content, "TOPLEFT", 32, y)
         repair:SetSize(220, 24)
-        repair:SetText("Create/repair fixed WA")
+        repair:SetText(S2K_L("Create/repair fixed WA"))
         repair:SetScript("OnClick", function()
             local compatible, reason = GetWeakAurasCompatibilityStatus and GetWeakAurasCompatibilityStatus()
             if not compatible then
@@ -3012,7 +3112,7 @@ function BuildOptionsPanel()
         intro:SetPoint("TOPLEFT", content, "TOPLEFT", 16, y)
         intro:SetWidth(610)
         intro:SetJustifyH("LEFT")
-        intro:SetText("Dominos mode leaves the action bars in their normal Dominos positions with their normal Dominos Show States. Editable mode temporarily saves those values, clears the selected bars' Show States, and arranges the checked bars for easy editing.")
+        intro:SetText(S2K_L("Dominos mode leaves the action bars in their normal Dominos positions with their normal Dominos Show States. Editable mode temporarily saves those values, clears the selected bars' Show States, and arranges the checked bars for easy editing."))
         RegisterS2KResponsiveItem(content, intro, { left = 16, right = 24, minWidth = 260, baseWidth = 610, expand = true })
         y = y - 88
 
@@ -3048,7 +3148,7 @@ function BuildOptionsPanel()
 
         local applyButton = CreateFrame("Button", content:GetName() .. "DominosApplyButton", content, "UIPanelButtonTemplate")
         applyButton:SetSize(150, 24)
-        applyButton:SetText("Apply now")
+        applyButton:SetText(S2K_L("Apply now"))
         applyButton:SetScript("OnClick", function()
             if RequestDominosApply then RequestDominosApply() end
         end)
@@ -3083,7 +3183,7 @@ function BuildOptionsPanel()
         note:SetPoint("TOPLEFT", content, "TOPLEFT", 16, y)
         note:SetWidth(610)
         note:SetJustifyH("LEFT")
-        note:SetText("No compatible addons are currently loaded.\nSupported integrations: WeakAuras and Dominos.")
+        note:SetText(S2K_L("No compatible addons are currently loaded.\nSupported integrations: WeakAuras and Dominos."))
         y = y - 76
         content:SetHeight(math.abs(y) + 80)
     end
@@ -3107,7 +3207,7 @@ function BuildOptionsPanel()
         local cb = CreateFrame("CheckButton", content:GetName() .. "ProfilerEnabled", content, "InterfaceOptionsCheckButtonTemplate")
         cb:SetPoint("TOPLEFT", content, "TOPLEFT", 16, y)
         local text = cb.Text or _G[cb:GetName() .. "Text"]
-        if text then text:SetText("Enable internal profiler") end
+        if text then text:SetText(S2K_L("Enable internal profiler")) end
         cb.tooltipText = "Enable internal profiler"
         cb.tooltipRequirement = "When disabled, profiler wrappers are removed and no timing data is collected. Keep this OFF during normal gameplay."
         cb:SetScript("OnClick", function(self)
@@ -3133,7 +3233,7 @@ function BuildOptionsPanel()
         local waStats = CreateFrame("CheckButton", content:GetName() .. "WeakAuraAnchorStatsEnabled", content, "InterfaceOptionsCheckButtonTemplate")
         waStats:SetPoint("TOPLEFT", content, "TOPLEFT", 16, y)
         local waStatsText = waStats.Text or _G[waStats:GetName() .. "Text"]
-        if waStatsText then waStatsText:SetText("Show WeakAuras anchor stats panel") end
+        if waStatsText then waStatsText:SetText(S2K_L("Show WeakAuras anchor stats panel")) end
         waStats.tooltipText = "Show WeakAuras anchor stats panel"
         waStats.tooltipRequirement = "Shows a small movable panel with anchor engine timing, update cadence and fallback/relink counters."
         waStats:SetScript("OnClick", function(self)
@@ -3171,7 +3271,7 @@ function BuildOptionsPanel()
         y = y - 210
 
         content:SetHeight(math.abs(y) + 80)
-        RegisterS2KConfigPanel("debug", "Debug", panel, 4)
+        RegisterS2KConfigPanel("debug", "Debug", panel, 5)
     end
 
     State.optionsBuildComplete = true

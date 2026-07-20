@@ -135,6 +135,9 @@ function ApplyOptionsNow()
     if RefreshQuestReputationDisplay then
         RefreshQuestReputationDisplay()
     end
+    if ApplyChatSettings then
+        ApplyChatSettings()
+    end
 end
 
 function RequestApply()

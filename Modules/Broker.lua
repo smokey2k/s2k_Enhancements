@@ -42,9 +42,9 @@ function PopulateS2KLauncherTooltip(tooltip)
     if not tooltip or not tooltip.AddLine then return end
 
     tooltip:AddLine("s2k:Enhancements", 1, 0.82, 0)
-    tooltip:AddLine("Version " .. tostring(API and API.version or ""), 0.65, 0.65, 0.65)
+    tooltip:AddLine(S2K_LF("Version %s", tostring(API and API.version or "")), 0.65, 0.65, 0.65)
     tooltip:AddLine(" ")
-    tooltip:AddLine("Left-click: open or close configuration", 1, 1, 1)
+    tooltip:AddLine(S2K_L("Left-click: open or close configuration"), 1, 1, 1)
 
     if CanToggleDominosLayoutFromLauncher then
         local available, mode = CanToggleDominosLayoutFromLauncher()
@@ -52,14 +52,14 @@ function PopulateS2KLauncherTooltip(tooltip)
             local current = GetDominosLayoutDisplayName and GetDominosLayoutDisplayName(mode)
                 or (mode == "EDITABLE" and "Editable" or "Dominos")
             local target = mode == "EDITABLE" and "Dominos" or "Editable"
-            tooltip:AddLine("Dominos layout: " .. tostring(current), 0.45, 0.85, 1)
-            tooltip:AddLine("Right-click: switch to " .. target, 1, 1, 1)
+            tooltip:AddLine(S2K_LF("Dominos layout: %s", tostring(current)), 0.45, 0.85, 1)
+            tooltip:AddLine(S2K_LF("Right-click: switch to %s", target), 1, 1, 1)
         end
     end
 
     local owner = tooltip.GetOwner and tooltip:GetOwner()
     if State and State.minimapButton and owner == State.minimapButton then
-        tooltip:AddLine("Drag: reposition minimap icon", 0.8, 0.8, 0.8)
+        tooltip:AddLine(S2K_L("Drag: reposition minimap icon"), 0.8, 0.8, 0.8)
     end
 end
 

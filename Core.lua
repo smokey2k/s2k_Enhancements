@@ -37,6 +37,34 @@ DEFAULTS = {
 
     -- Quest enhancements.
     questReputationEnabled = true,
+    addonLocale = "AUTO",
+    -- Chat enhancements. Disabled by default to preserve Blizzard behavior.
+    chatEnabled = false,
+    chatAltInviteEnabled = true,
+    chatCopyEnabled = true,
+    chatEditBoxPosition = "BOTTOM",
+    chatEditBoxOffset = 2,
+    chatEditBoxHorizontalOffset = -5,
+    chatEditBoxWidth = 0,
+    chatEditBoxBorderStyle = "BLIZZARD",
+    chatEditBoxBackgroundColorR = 0.00,
+    chatEditBoxBackgroundColorG = 0.00,
+    chatEditBoxBackgroundColorB = 0.00,
+    chatEditBoxBackgroundColorA = 0.75,
+    chatEditBoxBorderThickness = 4,
+    chatEditBoxBorderInset = 0,
+    chatEditBoxBackgroundInset = 0,
+    chatFontKey = "FRIZQT",
+    chatFontPath = "Fonts\\FRIZQT__.TTF",
+    chatFontOutlineKey = "NONE",
+    chatTextAlign = "LEFT",
+    chatButtonAlign = "LEFT",
+    chatQuickJoinButtonEnabled = true,
+    chatMenuButtonEnabled = true,
+    chatButtonFrameEnabled = true,
+    chatButtonFrameSmart = false,
+    chatQuickJoinLDBEnabled = false,
+    chatMenuLDBEnabled = false,
 
     -- Dominos integration. Disabled by default so existing Dominos layouts are
     -- never changed until the player explicitly enables the integration.
@@ -326,6 +354,10 @@ State = {
     dominosOptionsPage = nil,
     interfaceOptionsPanel = nil,
     cachedTargetContext = nil,
+    chatInitialized = false,
+    chatCopyWindow = nil,
+    chatHookedFrames = {},
+    chatSmartWatchers = {},
 
     profilerActive = false,
     profilerWrapped = false,

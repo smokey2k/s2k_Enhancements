@@ -39,6 +39,7 @@ function S2KNP_OnEvent(self, event, arg1)
             RememberConfiguredFontPaths()
             SyncProfilerState()
             if InitializeQuestReputation then InitializeQuestReputation() end
+            if InitializeChatModule then InitializeChatModule() end
             S2KNP_ApplyModuleState()
         else
             S2KNP_InitializeLoadedAddon(arg1)
@@ -68,6 +69,7 @@ function S2KNP_OnEvent(self, event, arg1)
         if InitializeS2KMinimapIcon then InitializeS2KMinimapIcon() end
         if InitializeS2KInterfaceOptionsPanel then InitializeS2KInterfaceOptionsPanel() end
         if InitializeQuestReputation then InitializeQuestReputation() end
+        if InitializeChatModule then InitializeChatModule() end
         RebuildFontOptions()
         RebuildStatusBarTextureOptions()
         RememberConfiguredFontPaths()
@@ -88,6 +90,7 @@ function S2KNP_OnEvent(self, event, arg1)
         RefreshWeakAurasRuntime(true)
         DelayedRefreshVisibleTextFonts()
         DelayedRefreshVisibleStatusBarTextures()
+        if ApplyChatSettings then ApplyChatSettings() end
         if ScheduleDominosIntegrationApply then ScheduleDominosIntegrationApply() end
         return
     end

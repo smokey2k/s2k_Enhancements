@@ -94,6 +94,8 @@ function NormalizeDominosSettingsOnDB()
         end
         DB.dominosBars[i].anchored = DB.dominosBars[i].anchored and true or false
         DB.dominosBars[i].showStates = nil
+        local strata = DB.dominosBars[i].frameStrata
+        DB.dominosBars[i].frameStrata = type(strata) == 'string' and strata:upper() or nil
     end
 
     local mode = tostring(DB.dominosLayoutMode or "LOCKED"):upper()

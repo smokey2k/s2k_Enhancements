@@ -1,3 +1,17 @@
+# s2k:Enhancements 1.18.9-section-groups-chat-localization
+
+- Added bordered, subtly shaded group panels around every configuration section so settings inside modules remain visually distinct.
+- Added automatic English and Hungarian localization support with a language selector under General.
+- Added a configurable Chat module with Alt-click invites, chat-copy support, edit-box layout and appearance controls, font settings, side-button controls and optional Quick Join / Chat Menu LDB launchers.
+- Localized the standalone configuration navigation, common controls, descriptions and addon metadata.
+- Kept the addon-window header version display numeric-only.
+
+# s2k:Enhancements 1.18.8-dominos-frame-strata
+
+- Moved the Dominos Anchored column before the action-bar names.
+- Added a persistent Frame Strata dropdown for every detected Dominos action bar.
+- Reapplies configured action-bar strata if Dominos overwrites them and defers those changes during combat.
+
 # s2k:Enhancements 1.18.7-interface-open-button
 
 - Changed the LDB and minimap launcher icon to Ability_Racial_BearForm.
@@ -118,8 +132,6 @@
 - General now contains General and Profiles subpages.
 - Added General > General > Show minimap icon.
 - Moved the existing profile manager unchanged to General > Profiles.
-
-# Changelog
 
 ## 1.16.3-resize-performance
 

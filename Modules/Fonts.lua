@@ -6,6 +6,7 @@ FONT_PATH_SETTINGS = {
     { "hpRatioFontKey", "hpRatioFontPath" },
     { "nameFontKey", "nameFontPath" },
     { "levelOverlayFontKey", "levelOverlayFontPath" },
+    { "chatFontKey", "chatFontPath" },
 }
 
 function RebuildFontOptions()
