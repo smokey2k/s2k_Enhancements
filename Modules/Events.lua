@@ -13,6 +13,14 @@ function S2KNP_InitializeLoadedAddon(addonName)
         if ScheduleDominosIntegrationApply then ScheduleDominosIntegrationApply() end
     end
 
+    if DB and IsLoggedIn and IsLoggedIn() then
+        RebuildStatusBarTextureOptions()
+        RebuildBorderTextureOptions()
+        RememberConfiguredStatusBarTexturePaths()
+        RememberConfiguredBorderTexturePaths()
+        if RefreshAllOptionsPanels then RefreshAllOptionsPanels() end
+    end
+
     if RefreshAddonsOptionsAvailability then
         RefreshAddonsOptionsAvailability()
     end
@@ -72,8 +80,10 @@ function S2KNP_OnEvent(self, event, arg1)
         if InitializeChatModule then InitializeChatModule() end
         RebuildFontOptions()
         RebuildStatusBarTextureOptions()
+        RebuildBorderTextureOptions()
         RememberConfiguredFontPaths()
         RememberConfiguredStatusBarTexturePaths()
+        RememberConfiguredBorderTexturePaths()
         S2KNP_ApplyModuleState()
         SyncProfilerState()
         if ScheduleDominosIntegrationApply then ScheduleDominosIntegrationApply() end

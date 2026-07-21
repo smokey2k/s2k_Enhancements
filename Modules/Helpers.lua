@@ -197,6 +197,14 @@ function SetCustomColor(prefix, r, g, b, a)
 end
 
 function GetHealthbarColor(unit)
+    if CFG.targetHealthbarOverride and IsTargetUnit(unit) then
+        if CFG.targetHealthUseReactionColor then
+            local r, g, b = GetReactionColor(unit)
+            return r, g, b, 1
+        end
+        return GetCustomColor('targetHealthColor', 0.85, 0.10, 0.10, 1)
+    end
+
     if CFG.healthUseReactionColor then
         local r, g, b = GetReactionColor(unit)
         return r, g, b, 1
@@ -207,6 +215,17 @@ end
 
 function GetCastbarColor()
     return GetCustomColor("castbarColor", 1.00, 0.70, 0.10, 1)
+end
+
+function GetHealthBackdropColor(ctx)
+    if ctx and CFG.targetHealthbarOverride and IsTargetUnit(ctx.unit) then
+        return GetCustomColor('targetHealthBackdropColor', 0.00, 0.00, 0.00, 0.65)
+    end
+    return GetCustomColor('healthBackdropColor', 0.00, 0.00, 0.00, CFG.healthBackgroundAlpha or 0.65)
+end
+
+function GetCastbarBackdropColor()
+    return GetCustomColor('castbarBackdropColor', 0.00, 0.00, 0.00, 0.75)
 end
 
 function GetCastbarBorderColor()
@@ -242,7 +261,7 @@ function GetTargetBorderColor()
 end
 
 function GetCurrentNameplateBorderColor(ctx)
-    if ctx and ctx.unit and CFG.targetBorderOverride and IsTargetUnit(ctx.unit) then
+    if ctx and ctx.unit and CFG.targetHealthbarOverride and IsTargetUnit(ctx.unit) then
         return GetTargetBorderColor()
     end
     return GetAllBorderColor()

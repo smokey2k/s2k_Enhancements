@@ -1,3 +1,54 @@
+# s2k:Enhancements 1.18.18-healthbar-color-layout
+
+- Moved the reaction-color controls next to and before their corresponding custom healthbar color pickers in both general and target sections.
+
+# s2k:Enhancements 1.18.17-separate-target-healthbar
+
+- Added an optional complete target-only healthbar style with independent size, offset, texture, color, reaction color, backdrop and border settings.
+- Reorganized the Healthbar page into General healthbar and Target healthbar sections.
+- Migrates the previous separate-target-border configuration into the complete target style while copying existing general bar values for compatibility.
+
+# s2k:Enhancements 1.18.16-bar-backdrop-colors
+
+- Added independent color and opacity pickers for the healthbar and castbar backdrop textures.
+- Backdrop colors are always custom and do not use unit reaction colors.
+
+# s2k:Enhancements 1.18.15-bar-backdrop-textures
+
+- Added previewed LibSharedMedia texture selectors for the healthbar and castbar backdrops.
+- Existing profiles retain their flat, solid backdrop through compatible defaults.
+
+# s2k:Enhancements 1.18.14-nameplate-border-recycle-fix
+
+- Fixed malformed target borders after a nameplate left the screen and later returned.
+- Rebuilds backdrop edge geometry after recycled nameplates become visible and after Blizzard's delayed nameplate scale transition settles.
+
+# s2k:Enhancements 1.18.13-hp-ratio-accuracy
+
+- Fixed the nameplate HP ratio overlay rounding every result upward to the next whole number.
+- HP ratios now use normal rounding with one decimal of precision, while redundant trailing .0 values remain hidden.
+
+# s2k:Enhancements 1.18.12-media-previews-borders
+
+- Added in-list texture previews with overlaid names to the healthbar, castbar and spark texture selectors.
+- Added a previewed border-media selector containing compatible Blizzard borders and every border registered through LibSharedMedia.
+- Replaced fixed 1/2/3 px border styles with per-border Size, Inset and Offset controls for normal, target and castbar borders.
+- Preserved the legacy solid border renderer and automatically migrated existing None/Thin/Thick/Heavy profile settings.
+- Refreshes media lists when late-loading SharedMedia provider addons become available.
+
+# s2k:Enhancements 1.18.11-options-layout-slider-inputs
+
+- Added a checkbox-width inner margin between section borders and their content on both sides.
+- Combined Language with Minimap under General and combined spell activation overlays with quest reputation rewards under Blizzard Tweaks.
+- Consolidated the Profiles page into one more compact section and fixed its left-overflowing status labels.
+- Left-aligned long slider titles, including Player cast overlay frame level, so they no longer overflow the section border.
+- Added a validated numeric input beside every slider, including type, min/max and step validation with invalid input rollback.
+
+# s2k:Enhancements 1.18.10-compact-section-groups
+
+- Restyled configuration section groups to match the compact framed layout used by classic Legion addons.
+- Moved smaller cyan section titles above the borders, increased background opacity and reduced excess vertical and horizontal spacing.
+
 # s2k:Enhancements 1.18.9-section-groups-chat-localization
 
 - Added bordered, subtly shaded group panels around every configuration section so settings inside modules remain visually distinct.

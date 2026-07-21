@@ -161,7 +161,9 @@ function RequestStatusBarTextureRefresh()
     end
 
     RebuildStatusBarTextureOptions()
+    RebuildBorderTextureOptions()
     RememberConfiguredStatusBarTexturePaths()
+    RememberConfiguredBorderTexturePaths()
     UpdateAll(true)
     ScheduleVisibleStatusBarTextureRefreshes(true)
 end

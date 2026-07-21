@@ -126,6 +126,37 @@ function CopyDefaults()
         return
     end
 
+    if not DB.borderMediaV1Migrated then
+        local sizes = {NONE=0, THIN=1, THICK=2, HEAVY=3}
+        local function Migrate(styleKey, textureKey, pathKey, sizeKey, offsetKey)
+            local size = sizes[tostring(DB[styleKey] or 'THIN'):upper()] or 1
+            DB[textureKey] = size <= 0 and 'NONE' or 'S2K_SOLID'
+            DB[pathKey] = 'Interface\\Buttons\\WHITE8X8'
+            DB[sizeKey], DB[offsetKey] = math.max(1, size), math.max(1, size)
+        end
+        Migrate('borderStyleKey', 'borderTextureKey', 'borderTexturePath', 'borderSize', 'borderOffset')
+        Migrate('targetBorderStyleKey', 'targetBorderTextureKey', 'targetBorderTexturePath', 'targetBorderSize', 'targetBorderOffset')
+        Migrate('castbarBorderStyleKey', 'castbarBorderTextureKey', 'castbarBorderTexturePath', 'castbarBorderSize', 'castbarBorderOffset')
+        DB.borderMediaV1Migrated = true
+    end
+
+    if not DB.targetHealthbarV1Migrated then
+        DB.targetPlateWidth = DB.plateWidth
+        DB.targetPlateHeight = DB.plateHeight
+        DB.targetPlateYOffset = DB.plateYOffset
+        DB.targetHealthTextureKey = DB.healthTextureKey
+        DB.targetHealthTexturePath = DB.healthTexturePath
+        DB.targetHealthUseReactionColor = DB.healthUseReactionColor
+        DB.targetHealthColorR, DB.targetHealthColorG = DB.healthColorR, DB.healthColorG
+        DB.targetHealthColorB, DB.targetHealthColorA = DB.healthColorB, DB.healthColorA
+        DB.targetHealthBackdropTextureKey = DB.healthBackdropTextureKey
+        DB.targetHealthBackdropTexturePath = DB.healthBackdropTexturePath
+        DB.targetHealthBackdropColorR, DB.targetHealthBackdropColorG = DB.healthBackdropColorR, DB.healthBackdropColorG
+        DB.targetHealthBackdropColorB, DB.targetHealthBackdropColorA = DB.healthBackdropColorB, DB.healthBackdropColorA
+        DB.targetHealthbarOverride = DB.targetBorderOverride and true or false
+        DB.targetHealthbarV1Migrated = true
+    end
+
     -- Rebuild CFG from the active profile every time. Do not leave stale values
     -- from the previously active profile in memory. This matters when older
     -- profiles do not contain a key that newer builds added later.

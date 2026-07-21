@@ -41,22 +41,29 @@ function CreateBorder(parent)
     return border
 end
 
-function ApplyBorderVisual(border, styleKey, r, g, b, a)
+function ApplyBorderVisual(border, textureKey, texturePath, size, inset, offset, r, g, b, a)
     if not border then
         return
     end
 
-    local thickness = GetBorderThickness(styleKey)
-    if thickness <= 0 then
+    textureKey = tostring(textureKey or 'S2K_SOLID')
+    if textureKey == 'NONE' then
         border:Hide()
         return
     end
-
+    size = math.max(1, math.min(64, tonumber(size) or 1))
+    inset = math.max(-32, math.min(32, tonumber(inset) or 0))
+    offset = math.max(0, math.min(32, tonumber(offset) or 0))
     local parent = border.s2kParent or border:GetParent()
     if parent then
+        if inset > 0 and parent.GetWidth and parent.GetHeight then
+            local halfSize = math.min(parent:GetWidth() or 0, parent:GetHeight() or 0) / 2
+            inset = math.min(inset, math.max(0, halfSize - 1))
+        end
+        local extent = offset - inset
         border:ClearAllPoints()
-        border:SetPoint("TOPLEFT", parent, "TOPLEFT", -thickness, thickness)
-        border:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", thickness, -thickness)
+        border:SetPoint("TOPLEFT", parent, "TOPLEFT", -extent, extent)
+        border:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", extent, -extent)
     end
 
     r = r or 0
@@ -64,16 +71,22 @@ function ApplyBorderVisual(border, styleKey, r, g, b, a)
     b = b or 0
     a = a == nil and 1 or a
     local pieces = { border.top, border.bottom, border.left, border.right }
-    for _, piece in ipairs(pieces) do
-        if piece then
+    if textureKey == 'S2K_SOLID' then
+        border:SetBackdrop(nil)
+        for _, piece in ipairs(pieces) do
             piece:SetColorTexture(r, g, b, a)
+            piece:Show()
         end
+        border.top:SetHeight(size); border.bottom:SetHeight(size)
+        border.left:SetWidth(size); border.right:SetWidth(size)
+    else
+        for _, piece in ipairs(pieces) do piece:Hide() end
+        -- Legion can retain stale edge geometry when a backdrop is replaced
+        -- while its parent nameplate is hidden or being recycled.
+        border:SetBackdrop(nil)
+        border:SetBackdrop({edgeFile=texturePath, edgeSize=size})
+        border:SetBackdropBorderColor(r, g, b, a)
     end
-
-    if border.top then border.top:SetHeight(thickness) end
-    if border.bottom then border.bottom:SetHeight(thickness) end
-    if border.left then border.left:SetWidth(thickness) end
-    if border.right then border.right:SetWidth(thickness) end
 
     border:Show()
 end
@@ -207,12 +220,12 @@ function CreateNameplateContext(unit, plate)
 
     local bg = root:CreateTexture(nil, "BACKGROUND")
     bg:SetAllPoints(root)
-    bg:SetColorTexture(0, 0, 0, CFG.healthBackgroundAlpha or 0.65)
+    ApplyStatusBarBackdropTexture(bg, GetHealthBackdropTexturePath(ctx), GetHealthBackdropColor(ctx))
     ctx.background = bg
 
     local health = CreateFrame("StatusBar", healthName, root)
     health:SetAllPoints(root)
-    ApplyStatusBarTexture(health, GetHealthTexturePath())
+    ApplyStatusBarTexture(health, GetHealthTexturePath(ctx))
     health:SetMinMaxValues(0, 1)
     health:SetValue(1)
     ctx.health = health
@@ -287,7 +300,7 @@ function CreateNameplateContext(unit, plate)
     cast:SetStatusBarColor(1, 0.7, 0.1, 1)
     cast.bg = cast:CreateTexture(nil, "BACKGROUND")
     cast.bg:SetAllPoints(cast)
-    cast.bg:SetColorTexture(0, 0, 0, 0.75)
+    ApplyStatusBarBackdropTexture(cast.bg, GetCastbarBackdropTexturePath(), GetCastbarBackdropColor())
     cast:Hide()
     ctx.cast = cast
     cast.s2kNameplateContext = ctx

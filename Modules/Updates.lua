@@ -58,13 +58,13 @@ function UpdateName(ctx)
     ctx.name:Show()
 end
 
-function FormatCompactCeilNumber(value)
+function FormatHPRatioNumber(value)
     value = tonumber(value) or 0
     if value < 0 then value = 0 end
 
-    local whole = math.ceil(value)
     if value < 1000 then
-        return tostring(whole)
+        local text = string.format('%.1f', value)
+        return text:gsub('%.0$', '')
     end
 
     local divisor = 1000
@@ -74,7 +74,7 @@ function FormatCompactCeilNumber(value)
         suffix = "M"
     end
 
-    local shortValue = whole / divisor
+    local shortValue = value / divisor
     local text = string.format("%.1f", shortValue)
     text = text:gsub("%.0$", "")
     return text .. suffix
@@ -125,7 +125,7 @@ function UpdateHPRatio(ctx)
         return
     end
 
-    text:SetText(FormatCompactCeilNumber(unitMax / playerMax))
+    text:SetText(FormatHPRatioNumber(unitMax / playerMax))
     text:Show()
 end
 
@@ -862,12 +862,15 @@ function UpdateContext(ctx, full)
         ApplyContextStatusBarTextures(ctx)
     end
 
+    -- Backdrop borders must be laid out while the recycled nameplate root is
+    -- visible. Legion can otherwise cache malformed edge geometry until the
+    -- next target/layout change.
+    ctx.root:Show()
     LayoutAll(ctx)
     ApplyBlizzardVisualState(ctx)
     UpdateHealth(ctx)
     UpdatePlayerCastOverlay(ctx)
     UpdateName(ctx)
-    ctx.root:Show()
     UpdateHPThresholdMarker(ctx)
     UpdateUnitLevelOverlay(ctx)
     UpdateHPRatio(ctx)
@@ -957,7 +960,9 @@ end
 
 function RefreshVisibleStatusBarTextures()
     RebuildStatusBarTextureOptions()
+    RebuildBorderTextureOptions()
     RememberConfiguredStatusBarTexturePaths()
+    RememberConfiguredBorderTexturePaths()
     ApplyVisibleStatusBarTextures()
 end
 
@@ -972,6 +977,8 @@ end
 
 function DelayedRefreshVisibleStatusBarTextures()
     RebuildStatusBarTextureOptions()
+    RebuildBorderTextureOptions()
     RememberConfiguredStatusBarTexturePaths()
+    RememberConfiguredBorderTexturePaths()
     ScheduleVisibleStatusBarTextureRefreshes()
 end
