@@ -24,7 +24,7 @@ s2k:Enhancements is a modular enhancement addon containing:
 
 ## Important architecture
 
-- The addon does not use the Blizzard Interface Options panel.
+- The Blizzard Interface Options entry contains only one button that opens the standalone configuration window.
 - Configuration opens through:
   - `/s2ke`
   - LibDataBroker launcher

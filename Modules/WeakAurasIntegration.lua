@@ -190,34 +190,16 @@ function SafeHideFrame(frame)
     end
 end
 
-function RaiseWeakAuraRegion(region, anchorFrame, offset)
-    if not region or not anchorFrame then
-        return
-    end
-
-    offset = offset or 30
-
-    SafeCall(function()
-        if region.SetFrameStrata and anchorFrame.GetFrameStrata then
-            region:SetFrameStrata(anchorFrame:GetFrameStrata())
-        end
-        if region.SetFrameLevel and anchorFrame.GetFrameLevel then
-            region:SetFrameLevel(anchorFrame:GetFrameLevel() + offset)
-        end
-    end)
-end
-
 function AnchorWeakAuraToTarget(region, ctx)
     if not region or not ctx or not ctx.health or not FrameIsVisible(ctx.health) then
         return false
     end
 
-    -- Do not relayout the whole custom nameplate from the WeakAura path.
-    -- The normal nameplate runtime already keeps the custom frames positioned.
-    -- Here we only refresh the UIParent-safe dummy anchors and point the WA
-    -- region to those anchors. This avoids expensive aura/layout work every
-    -- frame and avoids anchoring the WA directly to a nameplate-child frame.
-    UpdateWAAnchors(ctx)
+    -- Prepare addon-owned bridge anchors. They are UIParent children, but are
+    -- attached to the custom s2k health/cast frames with SetPoint only.
+    local forceAnchors = ctx.s2kWAAnchorRegion ~= region
+    UpdateWAAnchors(ctx, forceAnchors)
+    ctx.s2kWAAnchorRegion = region
 
     local healthAnchor = ctx.waHealthAnchor or ctx.health
     local bottomAnchor = healthAnchor
@@ -235,7 +217,6 @@ function AnchorWeakAuraToTarget(region, ctx)
         region:SetPoint("BOTTOMRIGHT", bottomAnchor, "BOTTOMRIGHT", 0, 0)
     end)
 
-    RaiseWeakAuraRegion(region, healthAnchor, 35)
     SafeShowFrame(region)
     return true
 end
@@ -259,7 +240,6 @@ function AnchorWeakAuraToFallback(region)
         region:SetPoint("BOTTOMRIGHT", fallback, "BOTTOMRIGHT", 0, 0)
     end)
 
-    RaiseWeakAuraRegion(region, fallback, 35)
     SafeShowFrame(region)
     return true
 end
@@ -1163,6 +1143,9 @@ UpdateWeakAurasBinding = function()
         ok = AnchorWeakAuraToTarget(region, ctx)
     elseif CFG.weakAuraFallbackEnabled then
         mode = "fallback"
+        if CFG.debugWeakAuraAnchorStatsEnabled == true and State.weakAuraAnchorStats then
+            State.weakAuraAnchorStats.fallbacks = (State.weakAuraAnchorStats.fallbacks or 0) + 1
+        end
         ok = AnchorWeakAuraToFallback(region)
     end
 

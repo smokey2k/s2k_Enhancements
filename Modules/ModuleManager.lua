@@ -114,14 +114,13 @@ function S2KNP_RebuildRuntimeFlags()
     flags.targetRuntimeHealth = enabled and CFG.moduleTargetRuntimeHealthEnabled ~= false
     flags.weakAurasModule = enabled and CFG.moduleWeakAurasEnabled ~= false
     flags.weakAuras = flags.weakAurasModule and CFG.weakAurasEnabled == true
-    flags.weakAuraSmoothFollow = flags.weakAuras and CFG.weakAuraSmoothFollow == true and CFG.weakAuraTargetEnabled ~= false
+    flags.weakAuraAnchorStats = enabled and CFG.debugWeakAuraAnchorStatsEnabled == true
     flags.targetRuntime = flags.targetRuntimeHealth
         or flags.playerCastOverlay
-        or (flags.weakAuras and not CFG.weakAuraSmoothFollow)
     flags.castRuntime = flags.castbar
     flags.healthEvents = enabled
     flags.spellEvents = flags.castbar or flags.playerCastOverlay
-    flags.onUpdate = flags.weakAuras or flags.targetRuntime or flags.castRuntime or flags.auras
+    flags.onUpdate = flags.weakAuras or flags.targetRuntime or flags.castRuntime or flags.auras or flags.weakAuraAnchorStats
 
     State.runtimeFlags = flags
     return flags
@@ -150,6 +149,11 @@ function S2KNP_RegisterBaseEvents()
     A:RegisterEvent("NAME_PLATE_UNIT_REMOVED")
     A:RegisterEvent("PLAYER_TARGET_CHANGED")
     A:RegisterEvent("PLAYER_REGEN_ENABLED")
+    A:RegisterEvent("QUEST_DETAIL")
+    A:RegisterEvent("QUEST_PROGRESS")
+    A:RegisterEvent("QUEST_COMPLETE")
+    A:RegisterEvent("QUEST_ACCEPT_CONFIRM")
+    A:RegisterEvent("QUEST_LOG_UPDATE")
 end
 
 function S2KNP_ApplyModuleEventSubscriptions()

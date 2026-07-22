@@ -6,11 +6,20 @@ function S2KNP_InitializeLoadedAddon(addonName)
     local name = tostring(addonName or ""):lower()
     if name == "blizzard_questui" and InitializeQuestReputation then
         InitializeQuestReputation()
+        if InitializeQuestTweaks then InitializeQuestTweaks() end
     elseif name == "weakauras" or name:match("^weakauras[%-%_%.]?") then
         RefreshWeakAurasRuntime(true)
     elseif name == "dominos" then
         State.dominosActionBarCount = nil
         if ScheduleDominosIntegrationApply then ScheduleDominosIntegrationApply() end
+    end
+
+    if DB and IsLoggedIn and IsLoggedIn() then
+        RebuildStatusBarTextureOptions()
+        RebuildBorderTextureOptions()
+        RememberConfiguredStatusBarTexturePaths()
+        RememberConfiguredBorderTexturePaths()
+        if RefreshAllOptionsPanels then RefreshAllOptionsPanels() end
     end
 
     if RefreshAddonsOptionsAvailability then
@@ -32,12 +41,17 @@ function S2KNP_OnEvent(self, event, arg1)
         if arg1 == ADDON_NAME then
             EnsureDatabase()
             if ApplySpellActivationOverlaySetting then ApplySpellActivationOverlaySetting() end
+            if ApplyCameraDistanceSetting then ApplyCameraDistanceSetting() end
+            if ApplySpellQueueWindowSetting then ApplySpellQueueWindowSetting() end
             if InitializeS2KBroker then InitializeS2KBroker() end
             if InitializeS2KMinimapIcon then InitializeS2KMinimapIcon() end
+            if InitializeS2KInterfaceOptionsPanel then InitializeS2KInterfaceOptionsPanel() end
             RebuildFontOptions()
             RememberConfiguredFontPaths()
             SyncProfilerState()
             if InitializeQuestReputation then InitializeQuestReputation() end
+            if InitializeQuestTweaks then InitializeQuestTweaks() end
+            if InitializeChatModule then InitializeChatModule() end
             S2KNP_ApplyModuleState()
         else
             S2KNP_InitializeLoadedAddon(arg1)
@@ -47,6 +61,10 @@ function S2KNP_OnEvent(self, event, arg1)
 
     S2KNP_InitializeDatabaseRuntime()
     local flags = State.runtimeFlags
+
+    if S2K_HandleQuestTweakEvent then
+        S2K_HandleQuestTweakEvent(event, arg1)
+    end
 
     if event == "PLAYER_REGEN_ENABLED" then
         if State.pendingOptionsApply then
@@ -63,13 +81,20 @@ function S2KNP_OnEvent(self, event, arg1)
 
     if event == "PLAYER_LOGIN" then
         if ApplySpellActivationOverlaySetting then ApplySpellActivationOverlaySetting() end
+        if ApplyCameraDistanceSetting then ApplyCameraDistanceSetting() end
+        if ApplySpellQueueWindowSetting then ApplySpellQueueWindowSetting() end
         if InitializeS2KBroker then InitializeS2KBroker() end
         if InitializeS2KMinimapIcon then InitializeS2KMinimapIcon() end
+        if InitializeS2KInterfaceOptionsPanel then InitializeS2KInterfaceOptionsPanel() end
         if InitializeQuestReputation then InitializeQuestReputation() end
+        if InitializeQuestTweaks then InitializeQuestTweaks() end
+        if InitializeChatModule then InitializeChatModule() end
         RebuildFontOptions()
         RebuildStatusBarTextureOptions()
+        RebuildBorderTextureOptions()
         RememberConfiguredFontPaths()
         RememberConfiguredStatusBarTexturePaths()
+        RememberConfiguredBorderTexturePaths()
         S2KNP_ApplyModuleState()
         SyncProfilerState()
         if ScheduleDominosIntegrationApply then ScheduleDominosIntegrationApply() end
@@ -78,6 +103,8 @@ function S2KNP_OnEvent(self, event, arg1)
 
     if event == "PLAYER_ENTERING_WORLD" then
         if ApplySpellActivationOverlaySetting then ApplySpellActivationOverlaySetting() end
+        if ApplyCameraDistanceSetting then ApplyCameraDistanceSetting() end
+        if ApplySpellQueueWindowSetting then ApplySpellQueueWindowSetting() end
         ApplyNameplateCVarSettings()
         S2KNP_ApplyModuleState()
         UpdateAll(true)
@@ -86,6 +113,7 @@ function S2KNP_OnEvent(self, event, arg1)
         RefreshWeakAurasRuntime(true)
         DelayedRefreshVisibleTextFonts()
         DelayedRefreshVisibleStatusBarTextures()
+        if ApplyChatSettings then ApplyChatSettings() end
         if ScheduleDominosIntegrationApply then ScheduleDominosIntegrationApply() end
         return
     end
@@ -170,13 +198,11 @@ end
 
 function S2KNP_OnUpdate(self, elapsed)
     local flags = State.runtimeFlags
+
     if not flags or not flags.enabled then return end
 
     local profileStart = State.profilerActive and debugprofilestop()
 
-    if flags.weakAuraSmoothFollow then
-        UpdateWeakAuraSmoothFollowOnly()
-    end
 
     if flags.targetRuntime then
         State.smoothElapsed = State.smoothElapsed + elapsed
@@ -201,6 +227,12 @@ function S2KNP_OnUpdate(self, elapsed)
             FlushDirtyAuras()
         end
     end
+
+    if flags.weakAuraAnchorStats then
+        UpdateWeakAuraAnchorStatsPanel(elapsed)
+    end
+
+
 
     if flags.weakAuras then
         State.weakAuraSlowElapsed = State.weakAuraSlowElapsed + elapsed

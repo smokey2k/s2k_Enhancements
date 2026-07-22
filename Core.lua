@@ -1,7 +1,7 @@
 -- =========================================================
 -- s2k:Enhancements (s2k Enhancements)
 -- WoW 7.3.5
--- v1.18.2-spell-overlay-fix
+-- v1.18.7-interface-open-button
 -- Note: top-level helper functions are intentionally non-local to stay under the Lua 5.1 chunk-local limit.
 --
 -- Custom Blizzard-nameplate driven skin system.
@@ -22,7 +22,7 @@ _G.s2k_Enhancements = _G.s2k_Enhancements or {}
 API = _G.s2k_Enhancements
 -- Backward-compatible API alias for integrations written for the old addon name.
 _G.s2k_Nameplates = API
-API.version = "1.18.2-spell-overlay-fix"
+API.version = "1.18.7-interface-open-button"
 
 
 DEFAULTS = {
@@ -37,6 +37,42 @@ DEFAULTS = {
 
     -- Quest enhancements.
     questReputationEnabled = true,
+    questCurrencyRewardsEnabled = true,
+    questAutoAcceptEnabled = false,
+    questAutoTurnInEnabled = false,
+    questLevelDisplayEnabled = false,
+    questObjectiveTooltipEnabled = false,
+    questAutoAcceptShareEnabled = false,
+    cameraDistanceMaxZoomFactor = 2.6,
+    spellQueueWindow = 400,
+    addonLocale = "AUTO",
+    -- Chat enhancements. Disabled by default to preserve Blizzard behavior.
+    chatEnabled = false,
+    chatAltInviteEnabled = true,
+    chatCopyEnabled = true,
+    chatEditBoxPosition = "BOTTOM",
+    chatEditBoxOffset = 2,
+    chatEditBoxHorizontalOffset = -5,
+    chatEditBoxWidth = 0,
+    chatEditBoxBorderStyle = "BLIZZARD",
+    chatEditBoxBackgroundColorR = 0.00,
+    chatEditBoxBackgroundColorG = 0.00,
+    chatEditBoxBackgroundColorB = 0.00,
+    chatEditBoxBackgroundColorA = 0.75,
+    chatEditBoxBorderThickness = 4,
+    chatEditBoxBorderInset = 0,
+    chatEditBoxBackgroundInset = 0,
+    chatFontKey = "FRIZQT",
+    chatFontPath = "Fonts\\FRIZQT__.TTF",
+    chatFontOutlineKey = "NONE",
+    chatTextAlign = "LEFT",
+    chatButtonAlign = "LEFT",
+    chatQuickJoinButtonEnabled = true,
+    chatMenuButtonEnabled = true,
+    chatButtonFrameEnabled = true,
+    chatButtonFrameSmart = false,
+    chatQuickJoinLDBEnabled = false,
+    chatMenuLDBEnabled = false,
 
     -- Dominos integration. Disabled by default so existing Dominos layouts are
     -- never changed until the player explicitly enables the integration.
@@ -62,7 +98,12 @@ DEFAULTS = {
     -- Main custom nameplate
     plateWidth = 110,
     plateHeight = 12,
-    plateYOffset = 0,
+    plateYOffset = 0, -- legacy saved-variable compatibility
+    nameplateHitboxWidth = 110,
+    nameplateHitboxHeight = 45,
+    healthbarHitboxXOffset = 0,
+    healthbarHitboxYOffset = 0,
+    healthbarFrameStrata = "HIGH",
     healthTexture = "Interface\\TargetingFrame\\UI-StatusBar", -- legacy/custom fallback path
     healthTextureKey = "BLIZZARD_STATUSBAR",
     healthTexturePath = "Interface\\TargetingFrame\\UI-StatusBar",
@@ -76,17 +117,51 @@ DEFAULTS = {
     healthColorB = 0.10,
     healthColorA = 1.00,
     healthBackgroundAlpha = 0.65,
+    healthBackdropTextureKey = 'FLAT_WHITE',
+    healthBackdropTexturePath = 'Interface/Buttons/WHITE8X8',
+    healthBackdropColorR = 0.00,
+    healthBackdropColorG = 0.00,
+    healthBackdropColorB = 0.00,
+    healthBackdropColorA = 0.65,
 
     -- Healthbar border
-    healthBorder = true, -- legacy compatibility: false forces borderStyle to NONE
+    healthBorder = true, -- legacy SavedVariables compatibility
     borderStyleKey = "THIN",
+    borderTextureKey = 'S2K_SOLID',
+    borderTexturePath = 'Interface\\Buttons\\WHITE8X8',
+    borderSize = 1,
+    borderInset = 0,
+    borderOffset = 1,
     borderColorKey = "BLACK", -- legacy saved-variable compatibility
     borderColorR = 0.00,
     borderColorG = 0.00,
     borderColorB = 0.00,
     borderColorA = 1.00,
     targetBorderOverride = false,
+    targetHealthbarOverride = false,
+    targetPlateWidth = 110,
+    targetPlateHeight = 12,
+    targetPlateYOffset = 0,
+    targetHealthbarFrameStrata = "HIGH",
+    targetHealthTextureKey = 'BLIZZARD_STATUSBAR',
+    targetHealthTexturePath = 'Interface/TargetingFrame/UI-StatusBar',
+    targetHealthUseReactionColor = true,
+    targetHealthColorR = 0.85,
+    targetHealthColorG = 0.10,
+    targetHealthColorB = 0.10,
+    targetHealthColorA = 1.00,
+    targetHealthBackdropTextureKey = 'FLAT_WHITE',
+    targetHealthBackdropTexturePath = 'Interface/Buttons/WHITE8X8',
+    targetHealthBackdropColorR = 0.00,
+    targetHealthBackdropColorG = 0.00,
+    targetHealthBackdropColorB = 0.00,
+    targetHealthBackdropColorA = 0.65,
     targetBorderStyleKey = "THIN",
+    targetBorderTextureKey = 'S2K_SOLID',
+    targetBorderTexturePath = 'Interface\\Buttons\\WHITE8X8',
+    targetBorderSize = 1,
+    targetBorderInset = 0,
+    targetBorderOffset = 1,
     targetBorderColorKey = "WHITE", -- legacy saved-variable compatibility
     targetBorderColorR = 1.00,
     targetBorderColorG = 1.00,
@@ -100,6 +175,7 @@ DEFAULTS = {
     nameFontKey = "FRIZQT",
     nameFontPath = "Fonts\\FRIZQT__.TTF",
     nameFontOutlineKey = "OUTLINE",
+    nameOverlayFrameLevel = 36,
 
     -- HP ratio text
     hpRatioText = true,
@@ -129,13 +205,32 @@ DEFAULTS = {
     castbarColorG = 0.70,
     castbarColorB = 0.10,
     castbarColorA = 1.00,
+    castbarBackdropTextureKey = 'FLAT_WHITE',
+    castbarBackdropTexturePath = 'Interface/Buttons/WHITE8X8',
+    castbarBackdropColorR = 0.00,
+    castbarBackdropColorG = 0.00,
+    castbarBackdropColorB = 0.00,
+    castbarBackdropColorA = 0.75,
     castbarBorder = true,
     castbarBorderStyleKey = "THIN",
+    castbarBorderTextureKey = 'S2K_SOLID',
+    castbarBorderTexturePath = 'Interface\\Buttons\\WHITE8X8',
+    castbarBorderSize = 1,
+    castbarBorderInset = 0,
+    castbarBorderOffset = 1,
     castbarBorderColorR = 0.00,
     castbarBorderColorG = 0.00,
     castbarBorderColorB = 0.00,
     castbarBorderColorA = 1.00,
     showCastbarSpellName = true,
+    castbarSpellNameFontSize = 10,
+    castbarSpellNameFontKey = "FRIZQT",
+    castbarSpellNameFontPath = "Fonts\\FRIZQT__.TTF",
+    castbarSpellNameFontOutlineKey = "OUTLINE",
+    castbarSpellNameColorR = 1.00,
+    castbarSpellNameColorG = 1.00,
+    castbarSpellNameColorB = 1.00,
+    castbarSpellNameColorA = 1.00,
     showCastbarIcon = false,
     castbarIconSize = 18,
     castbarIconGap = 2,
@@ -261,10 +356,6 @@ DEFAULTS = {
     weakAuraTopGroupId = "s2k_NP_BT",
     weakAuraBottomGroupId = "s2k_NP_BB",
 
-    -- Keep the WA-safe dummy anchors glued to the moving target nameplate
-    -- every rendered frame. This is much cheaper than re-anchoring the full
-    -- WeakAura/bar groups every frame, but removes the visible camera-move lag.
-    weakAuraSmoothFollow = true,
 
 
     maxNameplates = 40,
@@ -279,6 +370,7 @@ DEFAULTS = {
     debugProfilerEnabled = false,
     debugProfilerMaxRows = 30,
     debugBenchmarkSeconds = 60,
+    debugWeakAuraAnchorStatsEnabled = false,
 }
 
 DBRoot = nil
@@ -300,6 +392,8 @@ State = {
     configPanels = {},
     configNavButtons = {},
     configSelectedPanel = nil,
+    nameplatePreviewFrame = nil,
+    nameplatePreviewRequested = false,
     brokerInitialized = false,
     fontOptions = {},
     fontOptionsByKey = {},
@@ -313,6 +407,9 @@ State = {
     weakAuraLastMode = nil,
     weakAuraLastTargetRegion = nil,
     weakAuraScaffoldDirty = true,
+    weakAuraAnchorStats = {},
+    weakAuraAnchorStatsPanel = nil,
+    weakAuraAnchorStatsElapsed = 0,
     auraDirtyUnits = {},
     auraDirtyElapsed = 0,
     castRuntimeElapsed = 0,
@@ -324,7 +421,12 @@ State = {
     dominosStatusText = nil,
     dominosStatusError = false,
     dominosOptionsPage = nil,
+    interfaceOptionsPanel = nil,
     cachedTargetContext = nil,
+    chatInitialized = false,
+    chatCopyWindow = nil,
+    chatHookedFrames = {},
+    chatSmartWatchers = {},
 
     profilerActive = false,
     profilerWrapped = false,
@@ -347,6 +449,17 @@ FONT_OUTLINE_OPTIONS = {
     { key = "MONOCHROME",           label = "Monochrome",               flags = "MONOCHROME" },
     { key = "MONOCHROME_OUTLINE",   label = "Monochrome outline",       flags = "MONOCHROME,OUTLINE" },
     { key = "MONOCHROME_THICK",     label = "Monochrome thick outline", flags = "MONOCHROME,THICKOUTLINE" },
+}
+
+FRAME_STRATA_OPTIONS = {
+    { key = "BACKGROUND",        label = "Background" },
+    { key = "LOW",               label = "Low" },
+    { key = "MEDIUM",            label = "Medium" },
+    { key = "HIGH",              label = "High" },
+    { key = "DIALOG",            label = "Dialog" },
+    { key = "FULLSCREEN",         label = "Fullscreen" },
+    { key = "FULLSCREEN_DIALOG",  label = "Fullscreen dialog" },
+    { key = "TOOLTIP",            label = "Tooltip" },
 }
 
 LEVEL_OVERLAY_ALIGN_OPTIONS = {

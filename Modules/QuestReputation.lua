@@ -141,6 +141,33 @@ function S2K_GetQuestReputationRewardLines()
     return lines
 end
 
+function S2K_GetQuestCurrencyRewardLines()
+    local lines = {}
+    if not CFG or CFG.questCurrencyRewardsEnabled == false then return lines end
+    if not GetNumQuestLogRewardCurrencies or not GetQuestLogRewardCurrencyInfo then return lines end
+
+    local count = tonumber(GetNumQuestLogRewardCurrencies()) or 0
+    local seen = {}
+    for index = 1, count do
+        local name, texture, quantity, currencyID = GetQuestLogRewardCurrencyInfo(index)
+        quantity = tonumber(quantity) or 0
+        currencyID = tonumber(currencyID)
+        if (not name or name == "") and currencyID and GetCurrencyInfo then
+            local currencyName, _, currencyTexture = GetCurrencyInfo(currencyID)
+            name = currencyName
+            texture = texture or currencyTexture
+        end
+        local key = currencyID or name
+        if name and name ~= "" and not seen[key] then
+            seen[key] = true
+            local icon = texture and ("|T" .. tostring(texture) .. ":16:16:0:0|t ") or ""
+            local amount = quantity >= 0 and ("+" .. tostring(quantity)) or tostring(quantity)
+            lines[#lines + 1] = icon .. tostring(name) .. ": " .. amount
+        end
+    end
+    return lines
+end
+
 local function EnsureQuestReputationFrame()
     if questReputationFrame then
         return questReputationFrame
@@ -161,41 +188,80 @@ local function EnsureQuestReputationFrame()
     questReputationFrame.text:SetJustifyH("LEFT")
     questReputationFrame.text:SetJustifyV("TOP")
 
+    questReputationFrame.currencyTitle = questReputationFrame:CreateFontString(nil, "ARTWORK", "QuestFont_Shadow_Huge")
+    questReputationFrame.currencyTitle:SetWidth(288)
+    questReputationFrame.currencyTitle:SetJustifyH("LEFT")
+    questReputationFrame.currencyTitle:SetJustifyV("TOP")
+
+    questReputationFrame.currencyText = questReputationFrame:CreateFontString(nil, "ARTWORK", "QuestFontNormalSmall")
+    questReputationFrame.currencyText:SetWidth(288)
+    questReputationFrame.currencyText:SetJustifyH("LEFT")
+    questReputationFrame.currencyText:SetJustifyV("TOP")
+
     questReputationFrame:Hide()
     return questReputationFrame
 end
 
 function S2K_QuestReputationTemplateElement()
-    if not CFG or CFG.questReputationEnabled == false then
+    if not CFG or (CFG.questReputationEnabled == false and CFG.questCurrencyRewardsEnabled == false) then
         if questReputationFrame then questReputationFrame:Hide() end
         return nil
     end
 
     local lines = S2K_GetQuestReputationRewardLines()
-    if #lines == 0 then
+    local currencyLines = S2K_GetQuestCurrencyRewardLines()
+    if #lines == 0 and #currencyLines == 0 then
         if questReputationFrame then questReputationFrame:Hide() end
         return nil
     end
 
     local frame = EnsureQuestReputationFrame()
     frame:ClearAllPoints()
-    frame.title:SetText(REPUTATION or "Reputation")
-    frame.text:SetText(table_concat(lines, "\n"))
+    frame.title:ClearAllPoints()
+    frame.text:ClearAllPoints()
+    frame.currencyTitle:ClearAllPoints()
+    frame.currencyText:ClearAllPoints()
+
+    local height = 0
+    if #lines > 0 then
+        frame.title:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, -height)
+        frame.title:SetText(REPUTATION or "Reputation")
+        frame.text:SetPoint("TOPLEFT", frame.title, "BOTTOMLEFT", 0, -5)
+        frame.text:SetText(table_concat(lines, "\n"))
+        frame.title:Show()
+        frame.text:Show()
+        height = height + (frame.title:GetStringHeight() or 18) + (frame.text:GetStringHeight() or (#lines * 14)) + 9
+    else
+        frame.title:Hide()
+        frame.text:Hide()
+    end
+
+    if #currencyLines > 0 then
+        frame.currencyTitle:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, -height)
+        frame.currencyTitle:SetText(S2K_L and S2K_L("Currency rewards") or "Currency rewards")
+        frame.currencyText:SetPoint("TOPLEFT", frame.currencyTitle, "BOTTOMLEFT", 0, -5)
+        frame.currencyText:SetText(table_concat(currencyLines, "\n"))
+        frame.currencyTitle:Show()
+        frame.currencyText:Show()
+        height = height + (frame.currencyTitle:GetStringHeight() or 18) + (frame.currencyText:GetStringHeight() or (#currencyLines * 14)) + 9
+    else
+        frame.currencyTitle:Hide()
+        frame.currencyText:Hide()
+    end
 
     if QuestInfoRewardsHeader and QuestInfoRewardsHeader.GetTextColor then
         frame.title:SetTextColor(QuestInfoRewardsHeader:GetTextColor())
+        frame.currencyTitle:SetTextColor(QuestInfoRewardsHeader:GetTextColor())
     end
     if QuestInfoDescriptionText and QuestInfoDescriptionText.GetTextColor then
         frame.text:SetTextColor(QuestInfoDescriptionText:GetTextColor())
+        frame.currencyText:SetTextColor(QuestInfoDescriptionText:GetTextColor())
     end
 
-    local titleHeight = frame.title:GetStringHeight() or 18
-    local textHeight = frame.text:GetStringHeight() or (#lines * 14)
-    frame:SetHeight(titleHeight + textHeight + 9)
+    frame:SetHeight(height)
     frame:Show()
     return frame
 end
-
 local function InsertQuestReputationElement(template)
     if type(template) ~= "table" or type(template.elements) ~= "table" then
         return false
@@ -261,5 +327,155 @@ end
 
 if API then
     API.GetQuestReputationRewardLines = S2K_GetQuestReputationRewardLines
+    API.GetQuestCurrencyRewardLines = S2K_GetQuestCurrencyRewardLines
     API.RefreshQuestReputationDisplay = RefreshQuestReputationDisplay
+end
+
+-- =========================================================
+-- Optional quest workflow and tooltip tweaks (WoW 7.3.5)
+-- =========================================================
+
+local questTooltipHooksInitialized = false
+local questInfoHookInitialized = false
+local questLogHookInitialized = false
+
+local function GetQuestLevelText(level)
+    level = tonumber(level)
+    if not level or level == 0 then return nil end
+    if level < 0 then return "??" end
+    return tostring(level)
+end
+
+local function GetCurrentQuestLogIndex()
+    local questID = GetQuestID and tonumber(GetQuestID())
+    if questID and questID > 0 and GetQuestLogIndexByID then
+        local index = tonumber(GetQuestLogIndexByID(questID))
+        if index and index > 0 then return index end
+    end
+    if GetQuestLogSelection then
+        local index = tonumber(GetQuestLogSelection())
+        if index and index > 0 then return index end
+    end
+end
+
+local function AddLevelToCurrentQuestTitle()
+    if not CFG or not CFG.questLevelDisplayEnabled or not QuestInfoTitleHeader or not GetQuestLogTitle then return end
+    local index = GetCurrentQuestLogIndex()
+    local title, level
+    if index then
+        title, level = GetQuestLogTitle(index)
+    else
+        title = QuestInfoTitleHeader:GetText()
+        title = title and title:gsub("^%[[^%]]+%]%s*", "")
+        level = GetQuestLevel and GetQuestLevel()
+    end
+    local levelText = GetQuestLevelText(level)
+    if title and levelText then QuestInfoTitleHeader:SetText("[" .. levelText .. "] " .. title) end
+end
+
+local function UpdateClassicQuestLogLevels()
+    if not CFG or not CFG.questLevelDisplayEnabled or not GetQuestLogTitle then return end
+    local offset = 0
+    if QuestLogListScrollFrame and FauxScrollFrame_GetOffset then offset = FauxScrollFrame_GetOffset(QuestLogListScrollFrame) or 0 end
+    local displayed = tonumber(QUESTS_DISPLAYED) or 25
+    for row = 1, displayed do
+        local text = _G["QuestLogTitle" .. row]
+        local index = offset + row
+        if text then
+            local title, level, _, isHeader = GetQuestLogTitle(index)
+            local levelText = not isHeader and GetQuestLevelText(level) or nil
+            if title and levelText then text:SetText("[" .. levelText .. "] " .. title) end
+        end
+    end
+end
+
+local function NormalizeObjectiveMatchText(text)
+    text = tostring(text or ""):lower()
+    text = text:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+    return text:gsub("[%p%c]", " "):gsub("%s+", " ")
+end
+
+local function AddMatchingQuestObjectivesToTooltip(tooltip, subjectName)
+    if not CFG or not CFG.questObjectiveTooltipEnabled or not tooltip or not subjectName then return end
+    if not GetNumQuestLogEntries or not GetQuestLogTitle or not GetNumQuestLeaderBoards or not GetQuestLogLeaderBoard then return end
+    local subject = NormalizeObjectiveMatchText(subjectName)
+    if subject == "" then return end
+    if tooltip.s2kQuestObjectiveSubject == subject then return end
+    tooltip.s2kQuestObjectiveSubject = subject
+    local added = 0
+    for questIndex = 1, tonumber(GetNumQuestLogEntries()) or 0 do
+        local questTitle, _, _, isHeader, isCollapsed = GetQuestLogTitle(questIndex)
+        if questTitle and not isHeader and not isCollapsed then
+            for objectiveIndex = 1, tonumber(GetNumQuestLeaderBoards(questIndex)) or 0 do
+                local description, _, finished = GetQuestLogLeaderBoard(objectiveIndex, questIndex)
+                if description and NormalizeObjectiveMatchText(description):find(subject, 1, true) then
+                    if added == 0 then tooltip:AddLine(S2K_L("Quest objectives"), 1, 0.82, 0, true) end
+                    local r, g, b = 1, 0.82, 0
+                    if finished then r, g, b = 0.25, 1, 0.25 end
+                    tooltip:AddLine(tostring(questTitle) .. ": " .. tostring(description), r, g, b, true)
+                    added = added + 1
+                    if added >= 8 then break end
+                end
+            end
+        end
+        if added >= 8 then break end
+    end
+    if added > 0 then tooltip:Show() end
+end
+
+local function QuestTooltipUnit(tooltip)
+    local name = tooltip and tooltip.GetUnit and select(1, tooltip:GetUnit())
+    if name then AddMatchingQuestObjectivesToTooltip(tooltip, name) end
+end
+
+local function QuestTooltipItem(tooltip)
+    local name = tooltip and tooltip.GetItem and select(1, tooltip:GetItem())
+    if name then AddMatchingQuestObjectivesToTooltip(tooltip, name) end
+end
+
+function InitializeQuestTweaks()
+    if hooksecurefunc then
+        if QuestInfo_Display and not questInfoHookInitialized then
+            hooksecurefunc("QuestInfo_Display", AddLevelToCurrentQuestTitle)
+            questInfoHookInitialized = true
+        end
+        if QuestLog_Update and not questLogHookInitialized then
+            hooksecurefunc("QuestLog_Update", UpdateClassicQuestLogLevels)
+            questLogHookInitialized = true
+        end
+    end
+    if not questTooltipHooksInitialized and GameTooltip and GameTooltip.HookScript then
+        GameTooltip:HookScript("OnTooltipSetUnit", QuestTooltipUnit)
+        GameTooltip:HookScript("OnTooltipSetItem", QuestTooltipItem)
+        GameTooltip:HookScript("OnTooltipCleared", function(self) self.s2kQuestObjectiveSubject = nil end)
+        if ItemRefTooltip and ItemRefTooltip.HookScript then
+            ItemRefTooltip:HookScript("OnTooltipSetItem", QuestTooltipItem)
+            ItemRefTooltip:HookScript("OnTooltipCleared", function(self) self.s2kQuestObjectiveSubject = nil end)
+        end
+        questTooltipHooksInitialized = true
+    end
+    return true
+end
+
+function RefreshQuestTweaksDisplay()
+    InitializeQuestTweaks()
+    if QuestLog_Update then QuestLog_Update() end
+    AddLevelToCurrentQuestTitle()
+end
+
+function S2K_HandleQuestTweakEvent(event)
+    if not CFG then return end
+    if event == "QUEST_DETAIL" and CFG.questAutoAcceptEnabled then
+        if AcceptQuest then AcceptQuest() end
+    elseif event == "QUEST_PROGRESS" and CFG.questAutoTurnInEnabled then
+        if IsQuestCompletable and IsQuestCompletable() and CompleteQuest then CompleteQuest() end
+    elseif event == "QUEST_COMPLETE" and CFG.questAutoTurnInEnabled then
+        local choices = GetNumQuestChoices and tonumber(GetNumQuestChoices()) or 0
+        if choices == 0 and GetQuestReward then GetQuestReward(1) end
+    elseif event == "QUEST_ACCEPT_CONFIRM" and CFG.questAutoAcceptShareEnabled then
+        if ConfirmAcceptQuest then ConfirmAcceptQuest() end
+        if StaticPopup_Hide then StaticPopup_Hide("QUEST_ACCEPT") end
+    elseif event == "QUEST_LOG_UPDATE" and CFG.questLevelDisplayEnabled then
+        UpdateClassicQuestLogLevels()
+    end
 end

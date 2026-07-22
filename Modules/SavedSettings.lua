@@ -94,6 +94,8 @@ function NormalizeDominosSettingsOnDB()
         end
         DB.dominosBars[i].anchored = DB.dominosBars[i].anchored and true or false
         DB.dominosBars[i].showStates = nil
+        local strata = DB.dominosBars[i].frameStrata
+        DB.dominosBars[i].frameStrata = type(strata) == 'string' and strata:upper() or nil
     end
 
     local mode = tostring(DB.dominosLayoutMode or "LOCKED"):upper()
@@ -118,9 +120,56 @@ function NormalizeDominosSettingsOnDB()
     DB.dominosEditSession.active = DB.dominosEditSession.active and true or false
 end
 
+
 function CopyDefaults()
     if type(DB) ~= "table" then
         return
+    end
+
+    if not DB.borderMediaV1Migrated then
+        local sizes = {NONE=0, THIN=1, THICK=2, HEAVY=3}
+        local function Migrate(styleKey, textureKey, pathKey, sizeKey, offsetKey)
+            local size = sizes[tostring(DB[styleKey] or 'THIN'):upper()] or 1
+            DB[textureKey] = size <= 0 and 'NONE' or 'S2K_SOLID'
+            DB[pathKey] = 'Interface\\Buttons\\WHITE8X8'
+            DB[sizeKey], DB[offsetKey] = math.max(1, size), math.max(1, size)
+        end
+        Migrate('borderStyleKey', 'borderTextureKey', 'borderTexturePath', 'borderSize', 'borderOffset')
+        Migrate('targetBorderStyleKey', 'targetBorderTextureKey', 'targetBorderTexturePath', 'targetBorderSize', 'targetBorderOffset')
+        Migrate('castbarBorderStyleKey', 'castbarBorderTextureKey', 'castbarBorderTexturePath', 'castbarBorderSize', 'castbarBorderOffset')
+        DB.borderMediaV1Migrated = true
+    end
+
+    if not DB.targetHealthbarV1Migrated then
+        DB.targetPlateWidth = DB.plateWidth
+        DB.targetPlateHeight = DB.plateHeight
+        DB.targetPlateYOffset = DB.plateYOffset
+        DB.targetHealthTextureKey = DB.healthTextureKey
+        DB.targetHealthTexturePath = DB.healthTexturePath
+        DB.targetHealthUseReactionColor = DB.healthUseReactionColor
+        DB.targetHealthColorR, DB.targetHealthColorG = DB.healthColorR, DB.healthColorG
+        DB.targetHealthColorB, DB.targetHealthColorA = DB.healthColorB, DB.healthColorA
+        DB.targetHealthBackdropTextureKey = DB.healthBackdropTextureKey
+        DB.targetHealthBackdropTexturePath = DB.healthBackdropTexturePath
+        DB.targetHealthBackdropColorR, DB.targetHealthBackdropColorG = DB.healthBackdropColorR, DB.healthBackdropColorG
+        DB.targetHealthBackdropColorB, DB.targetHealthBackdropColorA = DB.healthBackdropColorB, DB.healthBackdropColorA
+        DB.targetHealthbarOverride = DB.targetBorderOverride and true or false
+        DB.targetHealthbarV1Migrated = true
+    end
+
+    if not DB.unifiedHealthbarSizeV1Migrated then
+        local generalWidth = tonumber(DB.plateWidth) or tonumber(DEFAULTS.plateWidth) or 110
+        local targetWidth = tonumber(DB.targetPlateWidth) or generalWidth
+        local generalHeight = tonumber(DB.plateHeight) or tonumber(DEFAULTS.plateHeight) or 12
+        local targetHeight = tonumber(DB.targetPlateHeight) or generalHeight
+
+        DB.plateWidth = generalWidth
+        DB.plateHeight = generalHeight
+        DB.nameplateHitboxWidth = tonumber(DB.nameplateHitboxWidth) or math.max(generalWidth, targetWidth)
+        DB.nameplateHitboxHeight = tonumber(DB.nameplateHitboxHeight) or math.max(45, generalHeight, targetHeight)
+        DB.healthbarHitboxXOffset = tonumber(DB.healthbarHitboxXOffset) or 0
+        DB.healthbarHitboxYOffset = tonumber(DB.healthbarHitboxYOffset) or tonumber(DB.plateYOffset) or 0
+        DB.unifiedHealthbarSizeV1Migrated = true
     end
 
     -- Rebuild CFG from the active profile every time. Do not leave stale values

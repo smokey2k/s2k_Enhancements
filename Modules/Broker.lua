@@ -3,13 +3,30 @@
 -- =========================================================
 
 local S2K_MINIMAP_DEFAULT_POSITION = 225
-local S2K_MINIMAP_ICON_PATH = "Interface\\Icons\\INV_Misc_Gear_01"
+local S2K_MINIMAP_ICON_PATH = "Interface\\Icons\\Ability_Racial_BearForm"
 
-function HandleS2KLauncherClick(_, mouseButton)
+local function GetS2KLauncherMouseButton(firstArg, secondArg)
+    if type(secondArg) == "string" then
+        return secondArg
+    end
+
+    -- LibDataBroker display addons are not perfectly consistent here: some
+    -- call OnClick(frame, button), while others pass only the button string.
+    if type(firstArg) == "string" then
+        return firstArg
+    end
+
+    return secondArg
+end
+
+function HandleS2KLauncherClick(firstArg, secondArg)
+    local mouseButton = GetS2KLauncherMouseButton(firstArg, secondArg)
+
     if mouseButton == "RightButton" then
-        local available = CanToggleDominosLayoutFromLauncher and CanToggleDominosLayoutFromLauncher()
-        if available and ToggleDominosLayoutMode then
+        if ToggleDominosLayoutMode then
             ToggleDominosLayoutMode("launcher")
+        elseif S2KPrint then
+            S2KPrint("Dominos layout switching is not available.")
         end
         return
     end
@@ -25,9 +42,9 @@ function PopulateS2KLauncherTooltip(tooltip)
     if not tooltip or not tooltip.AddLine then return end
 
     tooltip:AddLine("s2k:Enhancements", 1, 0.82, 0)
-    tooltip:AddLine("Version " .. tostring(API and API.version or ""), 0.65, 0.65, 0.65)
+    tooltip:AddLine(S2K_LF("Version %s", tostring(API and API.version or "")), 0.65, 0.65, 0.65)
     tooltip:AddLine(" ")
-    tooltip:AddLine("Left-click: open or close configuration", 1, 1, 1)
+    tooltip:AddLine(S2K_L("Left-click: open or close configuration"), 1, 1, 1)
 
     if CanToggleDominosLayoutFromLauncher then
         local available, mode = CanToggleDominosLayoutFromLauncher()
@@ -35,14 +52,14 @@ function PopulateS2KLauncherTooltip(tooltip)
             local current = GetDominosLayoutDisplayName and GetDominosLayoutDisplayName(mode)
                 or (mode == "EDITABLE" and "Editable" or "Dominos")
             local target = mode == "EDITABLE" and "Dominos" or "Editable"
-            tooltip:AddLine("Dominos layout: " .. tostring(current), 0.45, 0.85, 1)
-            tooltip:AddLine("Right-click: switch to " .. target, 1, 1, 1)
+            tooltip:AddLine(S2K_LF("Dominos layout: %s", tostring(current)), 0.45, 0.85, 1)
+            tooltip:AddLine(S2K_LF("Right-click: switch to %s", target), 1, 1, 1)
         end
     end
 
     local owner = tooltip.GetOwner and tooltip:GetOwner()
     if State and State.minimapButton and owner == State.minimapButton then
-        tooltip:AddLine("Drag: reposition minimap icon", 0.8, 0.8, 0.8)
+        tooltip:AddLine(S2K_L("Drag: reposition minimap icon"), 0.8, 0.8, 0.8)
     end
 end
 

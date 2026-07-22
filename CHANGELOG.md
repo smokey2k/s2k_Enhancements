@@ -1,3 +1,102 @@
+# s2k:Enhancements 1.19.0
+
+- Fixed custom castbar spell names disappearing after an enemy's first cast.
+- Added configurable frame strata for general and target healthbars; connected castbars, overlays, buffs and debuffs inherit their healthbar's strata, while overlay frame levels remain independently configurable.
+- Improved custom nameplate layering so unrelated WeakAuras groups respect the configured nameplate strata.
+- Unified general and target healthbar dimensions and added configurable Blizzard nameplate hitbox width, height and healthbar position within the hitbox.
+- Added a movable, animated two-nameplate layout preview showing general and target healthbars, hitboxes, borders, castbars, overlays, buffs and debuffs.
+- Added font, size, outline and color controls for castbar spell names.
+- Consolidated Blizzard nameplate controls into a single General section.
+- Added maximum camera-distance and SpellQueueWindow controls, including world-latency detection and a recommended SpellQueueWindow starting value.
+- Added optional automatic quest acceptance, automatic completion without automatic reward selection, quest-level labels, quest-objective tooltip progress and automatic handling of shared-quest requests.
+- Added optional quest currency reward display for every currency reported by the Legion quest API, including Garrison and Order Resources, with dynamically sized quest reward content.
+- Removed the Blizzard Interface Options registration that could taint Compact Raid Frame profile handling; the standalone LDB, minimap and slash-command configuration entry points remain available.
+
+# s2k:Enhancements 1.18.18-healthbar-color-layout
+
+- Moved the reaction-color controls next to and before their corresponding custom healthbar color pickers in both general and target sections.
+
+# s2k:Enhancements 1.18.17-separate-target-healthbar
+
+- Added an optional complete target-only healthbar style with independent size, offset, texture, color, reaction color, backdrop and border settings.
+- Reorganized the Healthbar page into General healthbar and Target healthbar sections.
+- Migrates the previous separate-target-border configuration into the complete target style while copying existing general bar values for compatibility.
+
+# s2k:Enhancements 1.18.16-bar-backdrop-colors
+
+- Added independent color and opacity pickers for the healthbar and castbar backdrop textures.
+- Backdrop colors are always custom and do not use unit reaction colors.
+
+# s2k:Enhancements 1.18.15-bar-backdrop-textures
+
+- Added previewed LibSharedMedia texture selectors for the healthbar and castbar backdrops.
+- Existing profiles retain their flat, solid backdrop through compatible defaults.
+
+# s2k:Enhancements 1.18.14-nameplate-border-recycle-fix
+
+- Fixed malformed target borders after a nameplate left the screen and later returned.
+- Rebuilds backdrop edge geometry after recycled nameplates become visible and after Blizzard's delayed nameplate scale transition settles.
+
+# s2k:Enhancements 1.18.13-hp-ratio-accuracy
+
+- Fixed the nameplate HP ratio overlay rounding every result upward to the next whole number.
+- HP ratios now use normal rounding with one decimal of precision, while redundant trailing .0 values remain hidden.
+
+# s2k:Enhancements 1.18.12-media-previews-borders
+
+- Added in-list texture previews with overlaid names to the healthbar, castbar and spark texture selectors.
+- Added a previewed border-media selector containing compatible Blizzard borders and every border registered through LibSharedMedia.
+- Replaced fixed 1/2/3 px border styles with per-border Size, Inset and Offset controls for normal, target and castbar borders.
+- Preserved the legacy solid border renderer and automatically migrated existing None/Thin/Thick/Heavy profile settings.
+- Refreshes media lists when late-loading SharedMedia provider addons become available.
+
+# s2k:Enhancements 1.18.11-options-layout-slider-inputs
+
+- Added a checkbox-width inner margin between section borders and their content on both sides.
+- Combined Language with Minimap under General and combined spell activation overlays with quest reputation rewards under Blizzard Tweaks.
+- Consolidated the Profiles page into one more compact section and fixed its left-overflowing status labels.
+- Left-aligned long slider titles, including Player cast overlay frame level, so they no longer overflow the section border.
+- Added a validated numeric input beside every slider, including type, min/max and step validation with invalid input rollback.
+
+# s2k:Enhancements 1.18.10-compact-section-groups
+
+- Restyled configuration section groups to match the compact framed layout used by classic Legion addons.
+- Moved smaller cyan section titles above the borders, increased background opacity and reduced excess vertical and horizontal spacing.
+
+# s2k:Enhancements 1.18.9-section-groups-chat-localization
+
+- Added bordered, subtly shaded group panels around every configuration section so settings inside modules remain visually distinct.
+- Added automatic English and Hungarian localization support with a language selector under General.
+- Added a configurable Chat module with Alt-click invites, chat-copy support, edit-box layout and appearance controls, font settings, side-button controls and optional Quick Join / Chat Menu LDB launchers.
+- Localized the standalone configuration navigation, common controls, descriptions and addon metadata.
+- Kept the addon-window header version display numeric-only.
+
+# s2k:Enhancements 1.18.8-dominos-frame-strata
+
+- Moved the Dominos Anchored column before the action-bar names.
+- Added a persistent Frame Strata dropdown for every detected Dominos action bar.
+- Reapplies configured action-bar strata if Dominos overwrites them and defers those changes during combat.
+
+# s2k:Enhancements 1.18.7-interface-open-button
+
+- Changed the LDB and minimap launcher icon to Ability_Racial_BearForm.
+- Added a minimal Blizzard Interface > AddOns entry containing only one button that opens the standalone settings window.
+
+# s2k:Enhancements 1.18.6-ldb-dominos-click
+
+- Fixed Dominos/Editable right-click toggling from LDB display addons that pass the mouse button as the first OnClick argument.
+- The launcher now reports why Dominos layout switching is unavailable instead of silently doing nothing.
+
+# s2k:Enhancements 1.18.5-wa-bridge-anchor
+
+- Promoted the WeakAuras bridge anchor path to the only target nameplate anchor implementation.
+- Removed the legacy absolute WeakAuras anchor engine, the anchor-engine selector and the per-frame Smooth WeakAuras follow option.
+- Kept the movable WeakAuras anchor stats panel for bridge anchor timing and relink/fallback diagnostics.
+# s2k:Enhancements 1.18.4-wa-anchor-bridge
+
+- Added an experimental WeakAuras bridge anchor engine that attaches addon-owned UIParent anchors to the custom s2k target health/cast frames using SetPoint-only anchoring.
+- Kept the existing safe absolute WeakAuras anchor engine as the default and added an Addons > WeakAuras selector for switching between engines.
+- Added a Debug option and `/s2ke wastats` commands for a movable WeakAuras anchor stats panel showing update cadence, CPU timing, relinks and fallback counts.
 # s2k:Enhancements 1.18.3-weakauras-group-settings
 
 - Fixed s2k_NP_BT and s2k_NP_BB WeakAuras progress groups being repaired after changing their Group tab layout/style settings.
@@ -98,8 +197,6 @@
 - General now contains General and Profiles subpages.
 - Added General > General > Show minimap icon.
 - Moved the existing profile manager unchanged to General > Profiles.
-
-# Changelog
 
 ## 1.16.3-resize-performance
 

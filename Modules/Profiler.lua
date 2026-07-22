@@ -17,7 +17,6 @@ S2KNP_PROFILE_FUNCTION_NAMES = S2KNP_PROFILE_FUNCTION_NAMES or {
     "UpdateTargetRuntimeOnly",
     "UpdateVisibleCastRuntimeOnly",
     "UpdateTargetPlayerCastOverlayOnly",
-    "UpdateWeakAuraSmoothFollowOnly",
     "UpdateWAAnchors",
     "UpdateWeakAuraBarGroups",
     "FlushDirtyAuras",
@@ -264,6 +263,95 @@ function StartCPUBenchmark(seconds, withProfiler)
 end
 
 
+
+function EnsureWeakAuraAnchorStatsPanel()
+    if State.weakAuraAnchorStatsPanel then
+        return State.weakAuraAnchorStatsPanel
+    end
+
+    local panel = CreateFrame("Frame", "s2k_WeakAuraAnchorStatsPanel", UIParent)
+    panel:SetSize(260, 138)
+    panel:SetPoint("CENTER", UIParent, "CENTER", 0, 160)
+    panel:SetFrameStrata("DIALOG")
+    panel:SetFrameLevel(950)
+    panel:EnableMouse(true)
+    panel:SetMovable(true)
+    panel:RegisterForDrag("LeftButton")
+    panel:SetScript("OnDragStart", function(self) self:StartMoving() end)
+    panel:SetScript("OnDragStop", function(self) self:StopMovingOrSizing() end)
+
+    local bg = panel:CreateTexture(nil, "BACKGROUND")
+    bg:SetAllPoints(panel)
+    bg:SetColorTexture(0, 0, 0, 0.78)
+
+    local title = panel:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
+    title:SetPoint("TOPLEFT", panel, "TOPLEFT", 8, -8)
+    title:SetText("WA anchor engine")
+    panel.title = title
+
+    panel.lines = {}
+    for i = 1, 7 do
+        local line = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+        line:SetPoint("TOPLEFT", panel, "TOPLEFT", 8, -8 - (i * 16))
+        line:SetJustifyH("LEFT")
+        line:SetText("")
+        panel.lines[i] = line
+    end
+
+    panel:Hide()
+    State.weakAuraAnchorStatsPanel = panel
+    return panel
+end
+
+function SetWeakAuraAnchorStatsPanelEnabled(enabled)
+    SetBool("debugWeakAuraAnchorStatsEnabled", enabled and true or false)
+    if enabled then
+        ResetWeakAuraAnchorStats()
+        EnsureWeakAuraAnchorStatsPanel():Show()
+    elseif State.weakAuraAnchorStatsPanel then
+        State.weakAuraAnchorStatsPanel:Hide()
+    end
+    if S2KNP_ApplyModuleState then S2KNP_ApplyModuleState() end
+end
+
+function UpdateWeakAuraAnchorStatsPanel(elapsed)
+    if not CFG or CFG.debugWeakAuraAnchorStatsEnabled ~= true then
+        if State.weakAuraAnchorStatsPanel then State.weakAuraAnchorStatsPanel:Hide() end
+        return
+    end
+
+    State.weakAuraAnchorStatsElapsed = (State.weakAuraAnchorStatsElapsed or 0) + (elapsed or 0)
+    if State.weakAuraAnchorStatsElapsed < 0.20 then
+        return
+    end
+    State.weakAuraAnchorStatsElapsed = 0
+
+    local panel = EnsureWeakAuraAnchorStatsPanel()
+    if not panel:IsShown() then panel:Show() end
+
+    local stats = State.weakAuraAnchorStats
+    if type(stats) ~= "table" or not stats.startedAt then
+        ResetWeakAuraAnchorStats()
+        stats = State.weakAuraAnchorStats
+    end
+
+    local now = debugprofilestop and debugprofilestop() or (stats.startedAt or 0)
+    local elapsedMs = now - (stats.startedAt or now)
+    local elapsedSec = elapsedMs > 0 and (elapsedMs / 1000) or 0
+    local calls = stats.calls or 0
+    local avg = calls > 0 and ((stats.total or 0) / calls) or 0
+    local ups = elapsedSec > 0 and (calls / elapsedSec) or 0
+    local deltaAvg = (stats.deltaCount or 0) > 0 and ((stats.deltaTotal or 0) / (stats.deltaCount or 1)) or 0
+
+    panel.title:SetText("WA anchor engine: " .. tostring(stats.engine or GetWeakAuraAnchorEngine()))
+    panel.lines[1]:SetText(string.format("mode=%s  unit=%s", tostring(stats.mode or "none"), tostring(stats.unit or "")))
+    panel.lines[2]:SetText(string.format("updates/sec=%.1f  calls=%d", ups, calls))
+    panel.lines[3]:SetText(string.format("cpu avg=%.4f ms  max=%.4f ms", avg, stats.max or 0))
+    panel.lines[4]:SetText(string.format("delta avg=%.2f ms  max=%.2f ms", deltaAvg, stats.deltaMax or 0))
+    panel.lines[5]:SetText(string.format("ok=%d  fail=%d", stats.ok or 0, stats.fail or 0))
+    panel.lines[6]:SetText(string.format("relinks=%d  fallbacks=%d", stats.relinks or 0, stats.fallbacks or 0))
+    panel.lines[7]:SetText("drag to move")
+end
 function ProfilerPrintHelp()
     print("---- s2k:Enhancements commands ----")
     print("/s2ke               - open or close configuration")
@@ -277,6 +365,8 @@ function ProfilerPrintHelp()
     print("/s2ke prof print    - print profiler report")
     print("/s2ke prof          - same as /s2ke prof print")
     print("/s2ke cpu           - print WoW AddOnCPUUsage total")
+    print("/s2ke wastats on    - show WA anchor stats panel")
+    print("/s2ke wastats off   - hide WA anchor stats panel")
     print("/s2ke bench 60      - 60 sec WoW CPU benchmark, profiler OFF")
     print("/s2ke benchprof 60  - 60 sec benchmark plus internal function profiler")
     print("Aliases: profile on/off/reset/print also work.")
@@ -335,6 +425,21 @@ SlashCmdList["S2KNAMEPLATES"] = function(msg)
 
     if msg == "cpu" or msg == "usage" then
         PrintAddonCPUUsageSnapshot()
+        return
+    end
+
+    if msg == "wastats on" or msg == "wa stats on" then
+        SetWeakAuraAnchorStatsPanelEnabled(true)
+        return
+    end
+
+    if msg == "wastats off" or msg == "wa stats off" then
+        SetWeakAuraAnchorStatsPanelEnabled(false)
+        return
+    end
+
+    if msg == "wastats reset" or msg == "wa stats reset" then
+        ResetWeakAuraAnchorStats()
         return
     end
 

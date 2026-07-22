@@ -42,6 +42,15 @@ function ApplyCustomPlateScale(ctx)
     end
 
     local desiredScale = GetCustomPlateScale(ctx)
+
+    -- UIParent-parented roots do not inherit the Blizzard nameplate scale.
+    -- Their local scale is therefore already the desired effective scale.
+    if ctx.root.GetParent and ctx.root:GetParent() == UIParent then
+        ctx.s2kLastSafeLocalScale = desiredScale
+        ctx.root:SetScale(desiredScale)
+        return
+    end
+
     local inheritedScale = GetFrameScaleRelativeToUI(ctx.plate)
     local localScale = nil
 
@@ -75,7 +84,10 @@ function RefreshVisibleNameplateScales()
 
     for unit, ctx in pairs(State.plates) do
         if ctx and ctx.unit and UnitExists(ctx.unit) and ctx.root and ctx.root:IsShown() then
-            ApplyCustomPlateScale(ctx)
+            -- Re-anchor and rebuild the border after Blizzard's nameplate scale
+            -- transition settles. On 7.3.5, refreshing only SetScale can leave
+            -- backdrop edge pieces using their hidden/recycled dimensions.
+            PositionRoot(ctx)
         end
     end
 end
@@ -112,15 +124,23 @@ function PositionRoot(ctx)
     local uf = GetUnitFrameFromPlate(plate)
     local blizzHB = uf and GetHealthBarFromUF(uf)
 
+    local useTarget = CFG.targetHealthbarOverride and IsTargetUnit(ctx.unit)
+    local plateWidth = tonumber(CFG.plateWidth) or 110
+    local plateHeight = tonumber(CFG.plateHeight) or 12
+    local xOffset = tonumber(CFG.healthbarHitboxXOffset) or 0
+    local yOffset = tonumber(CFG.healthbarHitboxYOffset) or 0
+
     root:ClearAllPoints()
-    if blizzHB and blizzHB.GetObjectType then
-        root:SetPoint("CENTER", blizzHB, "CENTER", 0, CFG.plateYOffset or 0)
-    else
-        root:SetPoint("CENTER", plate, "CENTER", 0, CFG.plateYOffset or 0)
+    if plate and plate.GetObjectType then
+        root:SetPoint("CENTER", plate, "CENTER", xOffset, yOffset)
+    elseif blizzHB and blizzHB.GetObjectType then
+        root:SetPoint("CENTER", blizzHB, "CENTER", xOffset, yOffset)
     end
 
-    root:SetSize(CFG.plateWidth or 110, CFG.plateHeight or 12)
+    root:SetSize(plateWidth, plateHeight)
+    ApplyStatusBarTexture(ctx.health, GetHealthTexturePath(ctx))
     ApplyCustomPlateScale(ctx)
+    SyncCustomFrameStrata(ctx)
 
     if root.SetFrameLevel then
         local level = 0
@@ -134,18 +154,20 @@ function PositionRoot(ctx)
     end
     SyncCustomFrameLevels(ctx)
 
-    local borderStyle = CFG.borderStyleKey or "THIN"
+    local textureKey, pathKey = 'borderTextureKey', 'borderTexturePath'
+    local sizeKey, insetKey, offsetKey = 'borderSize', 'borderInset', 'borderOffset'
     local br, bg, bb, ba = GetAllBorderColor()
 
-    -- Border visibility is now controlled by borderStyleKey / targetBorderStyleKey.
-    -- The old healthBorder boolean is kept only for saved-variable compatibility.
-    if CFG.targetBorderOverride and IsTargetUnit(ctx.unit) then
-        borderStyle = CFG.targetBorderStyleKey or borderStyle
+    -- Border visibility is controlled by the selected normal/target border media.
+    -- Legacy style keys and healthBorder remain in SavedVariables for compatibility.
+    if useTarget then
+        textureKey, pathKey = 'targetBorderTextureKey', 'targetBorderTexturePath'
+        sizeKey, insetKey, offsetKey = 'targetBorderSize', 'targetBorderInset', 'targetBorderOffset'
         br, bg, bb, ba = GetTargetBorderColor()
     end
 
-    ApplyBorderVisual(ctx.border, borderStyle, br, bg, bb, ba)
-    ctx.background:SetColorTexture(0, 0, 0, CFG.healthBackgroundAlpha or 0.65)
+    ApplyBorderVisual(ctx.border, CFG[textureKey], GetConfiguredBorderTexturePath(textureKey, pathKey), CFG[sizeKey], CFG[insetKey], CFG[offsetKey], br, bg, bb, ba)
+    ApplyStatusBarBackdropTexture(ctx.background, GetHealthBackdropTexturePath(ctx), GetHealthBackdropColor(ctx))
 end
 
 function ApplyCastbarBorderVisual(ctx)
@@ -159,7 +181,7 @@ function ApplyCastbarBorderVisual(ctx)
     end
 
     local r, g, b, a = GetCastbarBorderColor()
-    ApplyBorderVisual(ctx.castBorder, CFG.castbarBorderStyleKey or "THIN", r, g, b, a)
+    ApplyBorderVisual(ctx.castBorder, CFG.castbarBorderTextureKey, GetConfiguredBorderTexturePath('castbarBorderTextureKey', 'castbarBorderTexturePath'), CFG.castbarBorderSize, CFG.castbarBorderInset, CFG.castbarBorderOffset, r, g, b, a)
 end
 
 function PositionCastbar(ctx)

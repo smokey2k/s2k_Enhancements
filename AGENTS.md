@@ -9,3 +9,5 @@
 - Run Lua syntax validation on every Lua file.
 - Package releases with `s2k_Enhancements` as the top-level directory.
 - Update `CHANGELOG.md` and the TOC version for every release.
+- In the addon window header, display only the numeric version; never show a build or release suffix beside it.
+- Keep sections within each configuration module visually distinct and easy to scan, using bordered groups, spacing, contrasting backgrounds, or an equivalent clear separation.

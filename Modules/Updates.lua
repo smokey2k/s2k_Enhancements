@@ -46,7 +46,7 @@ function UpdateName(ctx)
 
     ApplyFontStringFont(ctx.name, CFG.nameFontKey, CFG.nameFontSize, CFG.nameFontOutlineKey, CFG.nameFontPath)
     if ctx.nameLayer and ctx.nameLayer.SetFrameLevel and ctx.root and ctx.root.GetFrameLevel then
-        ctx.nameLayer:SetFrameLevel((ctx.root:GetFrameLevel() or 0) + 36)
+        ctx.nameLayer:SetFrameLevel((ctx.root:GetFrameLevel() or 0) + (tonumber(CFG.nameOverlayFrameLevel) or 36))
         ctx.nameLayer:Show()
     end
     if ctx.name.SetDrawLayer then
@@ -58,13 +58,13 @@ function UpdateName(ctx)
     ctx.name:Show()
 end
 
-function FormatCompactCeilNumber(value)
+function FormatHPRatioNumber(value)
     value = tonumber(value) or 0
     if value < 0 then value = 0 end
 
-    local whole = math.ceil(value)
     if value < 1000 then
-        return tostring(whole)
+        local text = string.format('%.1f', value)
+        return text:gsub('%.0$', '')
     end
 
     local divisor = 1000
@@ -74,7 +74,7 @@ function FormatCompactCeilNumber(value)
         suffix = "M"
     end
 
-    local shortValue = whole / divisor
+    local shortValue = value / divisor
     local text = string.format("%.1f", shortValue)
     text = text:gsub("%.0$", "")
     return text .. suffix
@@ -125,7 +125,7 @@ function UpdateHPRatio(ctx)
         return
     end
 
-    text:SetText(FormatCompactCeilNumber(unitMax / playerMax))
+    text:SetText(FormatHPRatioNumber(unitMax / playerMax))
     text:Show()
 end
 
@@ -572,6 +572,11 @@ function HideCastbar(ctx)
         ctx.castText:SetText("")
         ctx.castText:Hide()
     end
+    if ctx then
+        -- The text was cleared above, so invalidate its cache as well.
+        -- Otherwise the same spell skips SetText and remains blank.
+        ctx.s2kLastCastName = nil
+    end
 end
 
 function UpdateCast(ctx)
@@ -641,6 +646,12 @@ function UpdateCast(ctx)
     if ApplyCastbarBorderVisual then ApplyCastbarBorderVisual(ctx) end
 
     if ctx.castText then
+        local textR, textG, textB, textA = GetCastbarSpellNameColor()
+        if ctx.s2kLastCastTextR ~= textR or ctx.s2kLastCastTextG ~= textG or ctx.s2kLastCastTextB ~= textB or ctx.s2kLastCastTextA ~= textA then
+            ctx.castText:SetTextColor(textR, textG, textB, textA)
+            ctx.s2kLastCastTextR, ctx.s2kLastCastTextG = textR, textG
+            ctx.s2kLastCastTextB, ctx.s2kLastCastTextA = textB, textA
+        end
         if CFG.showCastbarSpellName then
             if ctx.s2kLastCastName ~= name then
                 ctx.castText:SetText(name or "")
@@ -862,12 +873,15 @@ function UpdateContext(ctx, full)
         ApplyContextStatusBarTextures(ctx)
     end
 
+    -- Backdrop borders must be laid out while the recycled nameplate root is
+    -- visible. Legion can otherwise cache malformed edge geometry until the
+    -- next target/layout change.
+    ctx.root:Show()
     LayoutAll(ctx)
     ApplyBlizzardVisualState(ctx)
     UpdateHealth(ctx)
     UpdatePlayerCastOverlay(ctx)
     UpdateName(ctx)
-    ctx.root:Show()
     UpdateHPThresholdMarker(ctx)
     UpdateUnitLevelOverlay(ctx)
     UpdateHPRatio(ctx)
@@ -906,6 +920,10 @@ function ApplyVisibleTextFonts()
             end
             if ctx.name then
                 ApplyFontStringFont(ctx.name, CFG.nameFontKey, CFG.nameFontSize, CFG.nameFontOutlineKey, CFG.nameFontPath)
+            end
+            if ctx.castText then
+                ApplyFontStringFont(ctx.castText, CFG.castbarSpellNameFontKey, CFG.castbarSpellNameFontSize, CFG.castbarSpellNameFontOutlineKey, CFG.castbarSpellNameFontPath)
+                ctx.castText:SetTextColor(GetCastbarSpellNameColor())
             end
             if ctx.levelText then
                 ApplyFontStringFont(ctx.levelText, CFG.levelOverlayFontKey, CFG.levelOverlayFontSize, CFG.levelOverlayFontOutlineKey, CFG.levelOverlayFontPath)
@@ -957,7 +975,9 @@ end
 
 function RefreshVisibleStatusBarTextures()
     RebuildStatusBarTextureOptions()
+    RebuildBorderTextureOptions()
     RememberConfiguredStatusBarTexturePaths()
+    RememberConfiguredBorderTexturePaths()
     ApplyVisibleStatusBarTextures()
 end
 
@@ -972,6 +992,8 @@ end
 
 function DelayedRefreshVisibleStatusBarTextures()
     RebuildStatusBarTextureOptions()
+    RebuildBorderTextureOptions()
     RememberConfiguredStatusBarTexturePaths()
+    RememberConfiguredBorderTexturePaths()
     ScheduleVisibleStatusBarTextureRefreshes()
 end

@@ -41,22 +41,29 @@ function CreateBorder(parent)
     return border
 end
 
-function ApplyBorderVisual(border, styleKey, r, g, b, a)
+function ApplyBorderVisual(border, textureKey, texturePath, size, inset, offset, r, g, b, a)
     if not border then
         return
     end
 
-    local thickness = GetBorderThickness(styleKey)
-    if thickness <= 0 then
+    textureKey = tostring(textureKey or 'S2K_SOLID')
+    if textureKey == 'NONE' then
         border:Hide()
         return
     end
-
+    size = math.max(1, math.min(64, tonumber(size) or 1))
+    inset = math.max(-32, math.min(32, tonumber(inset) or 0))
+    offset = math.max(0, math.min(32, tonumber(offset) or 0))
     local parent = border.s2kParent or border:GetParent()
     if parent then
+        if inset > 0 and parent.GetWidth and parent.GetHeight then
+            local halfSize = math.min(parent:GetWidth() or 0, parent:GetHeight() or 0) / 2
+            inset = math.min(inset, math.max(0, halfSize - 1))
+        end
+        local extent = offset - inset
         border:ClearAllPoints()
-        border:SetPoint("TOPLEFT", parent, "TOPLEFT", -thickness, thickness)
-        border:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", thickness, -thickness)
+        border:SetPoint("TOPLEFT", parent, "TOPLEFT", -extent, extent)
+        border:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", extent, -extent)
     end
 
     r = r or 0
@@ -64,16 +71,22 @@ function ApplyBorderVisual(border, styleKey, r, g, b, a)
     b = b or 0
     a = a == nil and 1 or a
     local pieces = { border.top, border.bottom, border.left, border.right }
-    for _, piece in ipairs(pieces) do
-        if piece then
+    if textureKey == 'S2K_SOLID' then
+        border:SetBackdrop(nil)
+        for _, piece in ipairs(pieces) do
             piece:SetColorTexture(r, g, b, a)
+            piece:Show()
         end
+        border.top:SetHeight(size); border.bottom:SetHeight(size)
+        border.left:SetWidth(size); border.right:SetWidth(size)
+    else
+        for _, piece in ipairs(pieces) do piece:Hide() end
+        -- Legion can retain stale edge geometry when a backdrop is replaced
+        -- while its parent nameplate is hidden or being recycled.
+        border:SetBackdrop(nil)
+        border:SetBackdrop({edgeFile=texturePath, edgeSize=size})
+        border:SetBackdropBorderColor(r, g, b, a)
     end
-
-    if border.top then border.top:SetHeight(thickness) end
-    if border.bottom then border.bottom:SetHeight(thickness) end
-    if border.left then border.left:SetWidth(thickness) end
-    if border.right then border.right:SetWidth(thickness) end
 
     border:Show()
 end
@@ -137,7 +150,7 @@ function SyncCustomFrameLevels(ctx)
     end
 
     if ctx.nameLayer and ctx.nameLayer.SetFrameLevel then
-        ctx.nameLayer:SetFrameLevel(base + 61)
+        ctx.nameLayer:SetFrameLevel(base + (tonumber(CFG.nameOverlayFrameLevel) or 36))
     end
 
     if ctx.debuffFrame and ctx.debuffFrame.SetFrameLevel then
@@ -146,6 +159,39 @@ function SyncCustomFrameLevels(ctx)
 
     if ctx.buffFrame and ctx.buffFrame.SetFrameLevel then
         ctx.buffFrame:SetFrameLevel(base + 41)
+    end
+end
+
+local VALID_NAMEPLATE_FRAME_STRATA = {
+    BACKGROUND = true,
+    LOW = true,
+    MEDIUM = true,
+    HIGH = true,
+    DIALOG = true,
+    FULLSCREEN = true,
+    FULLSCREEN_DIALOG = true,
+    TOOLTIP = true,
+}
+
+function GetNameplateFrameStrata(ctx)
+    local key = IsTargetUnit(ctx and ctx.unit) and "targetHealthbarFrameStrata" or "healthbarFrameStrata"
+    local strata = tostring(CFG[key] or "HIGH"):upper()
+    return VALID_NAMEPLATE_FRAME_STRATA[strata] and strata or "HIGH"
+end
+
+function SyncCustomFrameStrata(ctx)
+    if not ctx or not ctx.root or not ctx.root.SetFrameStrata then return end
+
+    local strata = GetNameplateFrameStrata(ctx)
+    if ctx.s2kLastFrameStrata ~= strata then
+        ctx.root:SetFrameStrata(strata)
+        if ctx.waHealthAnchor and ctx.waHealthAnchor.SetFrameStrata then
+            ctx.waHealthAnchor:SetFrameStrata(strata)
+        end
+        if ctx.waCastAnchor and ctx.waCastAnchor.SetFrameStrata then
+            ctx.waCastAnchor:SetFrameStrata(strata)
+        end
+        ctx.s2kLastFrameStrata = strata
     end
 end
 
@@ -196,9 +242,13 @@ function CreateNameplateContext(unit, plate)
     local healthName = plateName and (plateName .. "S2KHealthBar") or nil
     local castName = plateName and (plateName .. "S2KCastBar") or nil
 
-    local root = CreateFrame("Frame", rootName, plate)
-    root:SetFrameStrata("HIGH")
+    -- Keep the visual root under UIParent so its configured frame strata is not
+    -- clamped by the Blizzard nameplate parent. PositionRoot still anchors it
+    -- to the recycled Blizzard healthbar/nameplate.
+    local root = CreateFrame("Frame", rootName, UIParent)
+    root:SetFrameStrata(GetNameplateFrameStrata(ctx))
     root:SetFrameLevel((plate.GetFrameLevel and plate:GetFrameLevel() or 0) + 100)
+    root:Hide()
     ctx.root = root
     root.s2kNameplateContext = ctx
 
@@ -207,12 +257,12 @@ function CreateNameplateContext(unit, plate)
 
     local bg = root:CreateTexture(nil, "BACKGROUND")
     bg:SetAllPoints(root)
-    bg:SetColorTexture(0, 0, 0, CFG.healthBackgroundAlpha or 0.65)
+    ApplyStatusBarBackdropTexture(bg, GetHealthBackdropTexturePath(ctx), GetHealthBackdropColor(ctx))
     ctx.background = bg
 
     local health = CreateFrame("StatusBar", healthName, root)
     health:SetAllPoints(root)
-    ApplyStatusBarTexture(health, GetHealthTexturePath())
+    ApplyStatusBarTexture(health, GetHealthTexturePath(ctx))
     health:SetMinMaxValues(0, 1)
     health:SetValue(1)
     ctx.health = health
@@ -287,7 +337,7 @@ function CreateNameplateContext(unit, plate)
     cast:SetStatusBarColor(1, 0.7, 0.1, 1)
     cast.bg = cast:CreateTexture(nil, "BACKGROUND")
     cast.bg:SetAllPoints(cast)
-    cast.bg:SetColorTexture(0, 0, 0, 0.75)
+    ApplyStatusBarBackdropTexture(cast.bg, GetCastbarBackdropTexturePath(), GetCastbarBackdropColor())
     cast:Hide()
     ctx.cast = cast
     cast.s2kNameplateContext = ctx
@@ -304,14 +354,14 @@ function CreateNameplateContext(unit, plate)
     local waCastAnchorName = plateName and (plateName .. "S2KWACastAnchor") or nil
 
     local waHealthAnchor = CreateFrame("Frame", waHealthAnchorName, UIParent)
-    waHealthAnchor:SetFrameStrata("HIGH")
+    waHealthAnchor:SetFrameStrata(GetNameplateFrameStrata(ctx))
     waHealthAnchor:SetFrameLevel(900)
     waHealthAnchor:Hide()
     waHealthAnchor.s2kNameplateContext = ctx
     ctx.waHealthAnchor = waHealthAnchor
 
     local waCastAnchor = CreateFrame("Frame", waCastAnchorName, UIParent)
-    waCastAnchor:SetFrameStrata("HIGH")
+    waCastAnchor:SetFrameStrata(GetNameplateFrameStrata(ctx))
     waCastAnchor:SetFrameLevel(901)
     waCastAnchor:Hide()
     waCastAnchor.s2kNameplateContext = ctx
@@ -321,7 +371,8 @@ function CreateNameplateContext(unit, plate)
     castText:SetPoint("CENTER", cast, "CENTER", 0, 0)
     castText:SetJustifyH("CENTER")
     castText:SetJustifyV("MIDDLE")
-    castText:SetTextColor(1, 1, 1, 1)
+    ApplyFontStringFont(castText, CFG.castbarSpellNameFontKey, CFG.castbarSpellNameFontSize, CFG.castbarSpellNameFontOutlineKey, CFG.castbarSpellNameFontPath)
+    castText:SetTextColor(GetCastbarSpellNameColor())
     castText:SetShadowColor(0, 0, 0, 1)
     castText:SetShadowOffset(1, -1)
     castText:Hide()
@@ -344,6 +395,7 @@ function CreateNameplateContext(unit, plate)
     ctx.buffFrame = buffFrame
 
     SyncCustomFrameLevels(ctx)
+    SyncCustomFrameStrata(ctx)
 
     plate.s2kNameplateContext = ctx
     plate.s2kCustomRoot = root
