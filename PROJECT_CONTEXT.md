@@ -2,122 +2,59 @@
 
 ## Current state
 
-Current stable version: 1.18.2
-Last verified commit: <commit SHA>
+Current stable version: 1.19.0
 Target client: World of Warcraft 7.3.5
 Interface version: 70300
 
 ## Purpose
 
-s2k:Enhancements is a modular enhancement addon containing:
-
-- custom nameplates
-- healthbar and castbar replacement
-- aura frames
-- overlays
-- quest reputation reward display
-- WeakAuras integration
-- Dominos integration
-- LibDataBroker launcher
-- minimap launcher
-- standalone configuration window
+s2k:Enhancements contains custom nameplates, configurable hitboxes and strata, aura and overlay frames, an animated layout preview, quest workflow and reward enhancements, Blizzard camera and SpellQueueWindow tweaks, WeakAuras and Dominos integrations, launchers and a standalone configuration window.
 
 ## Important architecture
 
-- The Blizzard Interface Options entry contains only one button that opens the standalone configuration window.
-- Configuration opens through:
-  - `/s2ke`
-  - LibDataBroker launcher
-  - minimap icon
-- SavedVariables:
-  - `s2k_EnhancementsDB`
-- Profiles must remain backward compatible.
-- Embedded libraries are stored under `Libs/`.
+- No panel is registered with Blizzard Interface Options, avoiding Compact Raid Frame profile taint on Legion.
+- Configuration opens through /s2ke, LibDataBroker or the minimap icon.
+- SavedVariables are s2k_EnhancementsDB with legacy s2k_NameplatesDB migration support.
+- Existing profiles and configuration keys must remain backward compatible.
+- Embedded libraries are stored under Libs.
+- AceConfig, AceGUI and AceDB are not currently used.
 
 ## Nameplates
 
-Custom Nameplates is the master switch.
+Custom Nameplates is the master switch. Subpages are General, Healthbar, Castbar, Overlays, Buffs and Debuffs. General and target healthbars share dimensions and hitbox placement. Target appearance can still be overridden. Child visuals inherit healthbar frame strata while overlay frame levels remain independently configurable.
 
-Submodules:
+Disabling Custom Nameplates requires UI reload and restores Blizzard visuals. Protected Blizzard frames must never be modified during combat.
 
-- General
-- Healthbar
-- Castbar
-- Overlays
-- Buffs
-- Debuffs
+## Quest tweaks
 
-Disabling Custom Nameplates requires UI reload and restores Blizzard visuals.
+Optional features include automatic accept, automatic turn-in without automatic reward choice, quest levels, tooltip objective progress, shared-quest acceptance, reputation rewards and all currency rewards reported by the Legion quest API.
 
 ## Dominos integration
 
-Supported Dominos version: <exact version>
-
-Modes:
-
-### Dominos
-
-Restores normal Dominos positions, docking and Show States.
-
-### Editable
-
-- temporarily saves Dominos positions and Show States
-- clears Show States
-- arranges selected action bars horizontally or vertically
-- wraps bars into additional rows or columns if they do not fit on screen
-
-Right-clicking the minimap or LDB launcher toggles Dominos/Editable mode.
+Dominos mode restores normal positions, docking and Show States. Editable mode temporarily saves these values and arranges selected bars horizontally or vertically with screen-aware wrapping. Right-clicking the minimap or LDB launcher toggles the mode when requirements are met.
 
 ## WeakAuras integration
 
-Describe the supported WeakAuras version and integration behavior here.
+Required client: WoW 7.3.5. Minimum supported WeakAuras version: 2.5.12. Bridge anchors connect supported target-nameplate WeakAuras groups without forcing user layout and style fields.
 
-## Known issues
+## Testing priorities
 
-- List known bugs here.
-- Mention features that were not verified in a real client.
-- Mention performance-sensitive code paths.
-
-## Next planned work
-
-1. ...
-2. ...
-3. ...
-
-## Testing
-
-Tested client:
-- WoW 7.3.5 build: ...
-
-Required test addons:
-- Dominos version: ...
-- WeakAuras version: ...
-- StatBlockCore version: ...
-
-Manual test procedure:
-
-1. Delete or back up SavedVariables.
-2. Start the game.
-3. Test `/s2ke`.
-4. Test LDB and minimap launchers.
-5. Test nameplate creation and removal.
-6. Test entering and leaving combat.
-7. Test Dominos mode switching.
-8. Test profile switching.
+1. Open and resize configuration with /s2ke, LDB and minimap launchers.
+2. Test nameplate creation, recycling, target switching, casting, auras, strata and hitbox clicks.
+3. Test general and target layout previews.
+4. Test quest detail, log and completion panels with reputation and currency rewards.
+5. Test entering and leaving combat, especially Dominos and protected frames.
+6. Test profile switching and legacy SavedVariables migration.
+7. Test compatible WeakAuras and Dominos installations.
 
 ## Packaging
 
-The release ZIP must contain:
-
-s2k_Enhancements/
-    s2k_Enhancements.toc
-    Core.lua
-    Modules/
-    Libs/
+The release ZIP must contain s2k_Enhancements as its top-level directory and include the TOC, Lua modules, locales and embedded libraries.
 
 ## Constraints
 
-- Do not break WoW 7.3.5 compatibility.
-- Do not use APIs introduced after Legion.
-- Do not change SavedVariables without a migration.
-- Protected frames must not be modified during combat.
+- Remain compatible with Lua 5.1 and Interface 70300.
+- Do not assume Retail APIs.
+- Do not change SavedVariables without migration.
+- Prefer events over per-frame polling.
+- Do not modify protected frames during combat.

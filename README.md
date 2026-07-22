@@ -1,29 +1,38 @@
 # s2k:Enhancements
 
-Moduláris kiegészítő World of Warcraft 7.3.5-höz. Egyedi nameplate-rendszert, küldetéskiegészítéseket és más addonokhoz kapcsolódó integrációkat tartalmaz.
+Moduláris kiegészítő World of Warcraft 7.3.5-höz (Interface 70300). Egyedi nameplate-rendszert, quest- és Blizzard-finomhangolásokat, valamint WeakAuras- és Dominos-integrációt tartalmaz.
 
-## Kód- és teljesítményoptimalizálás (1.18.0)
+## Fő funkciók
 
-A teljes addonforrás átvizsgálásra került. A működés és a profilformátum megtartása mellett csökkent a fölösleges runtime munka: a castbar frissítés csak az aktívan castoló nameplate-eket járja be, megszűnt a target cast kettős frissítése, a gyakori vizuális beállítások numerikus cache-t használnak, a nameplate-skála időzítői összevonódnak, a médiaregiszterek pedig nem épülnek újra minden késleltetett próbánál. A közös UI-, média-, frame- és CVar-segédek egységes helyre kerültek, az elavult és nem használt kód eltávolításra került.
+- Egyedi healthbarok és castbarok általános és target megjelenéssel.
+- Beállítható nameplate hitbox, közös healthbar-méret és a healthbar pozíciója a hitboxon belül.
+- Örökölt frame strata a kapcsolódó castbarokhoz, overlayekhez, buffokhoz és debuffokhoz, külön overlay frame level beállításokkal.
+- HP-, név-, szint-, threshold- és player-cast overlayek.
+- Buff- és debuffmegjelenítés.
+- Mozgatható, animált nameplate layout preview két próba-nameplate-tel.
+- Castbar spellnév betűtípus-, méret-, körvonal- és színbeállítás.
+- Quest reputáció- és currencyjutalmak, beleértve a Garrison és Order Resources jutalmakat.
+- Automatikus questelfogadás és -leadás, questszintek, tooltip-objective állapotok és megosztott questek kezelése.
+- Maximum camera distance és SpellQueueWindow beállítás latencyalapú ajánlással.
+- WeakAuras nameplate-integráció és Dominos action-bar elrendezés.
 
-## LDB és önálló konfigurációs ablak
+## Konfiguráció
 
-Az addon `s2k:Enhancements` néven regisztrál egy **LibDataBroker-1.1 launcher** objektumot. Emiatt a konfigurációs ablak elérhető LDB host/display addonokból, például a StatBlockCore-ból.
+Az addon kizárólag önálló konfigurációs ablakot használ. Nem regisztrál panelt a Blizzard Interface Options rendszerébe, mert az Legion alatt taintelheti a Compact Raid Frame profilkezelését.
 
-- Az LDB blokkon vagy a minimap ikonon bal egérgombbal kattintva megnyitható és bezárható a konfiguráció.
-- A `/s2ke` parancs szintén megnyitja vagy bezárja az ablakot.
-- A `/s2ke config`, `/s2ke options` és `/s2ke settings` megnyitja a konfigurációt.
-- A Blizzard Interface > AddOns panelen csak egy megnyito gomb jelenik meg; a teljes beallitofelulet tovabbra is az addon sajat ablakaban van.
+A beállítások megnyithatók:
 
-A szükséges `LibStub`, `CallbackHandler-1.0` és `LibDataBroker-1.1` könyvtárak be vannak ágyazva az addonba, ezért nincs szükség külön telepített LDB könyvtár-addonra.
+- az LDB launcher vagy a minimap ikon bal gombos kattintásával;
+- a /s2ke paranccsal;
+- a /s2ke config, /s2ke options vagy /s2ke settings paranccsal.
 
-A konfigurációs felület ebben a változatban az addon meglévő, bevált beállításkezelő rendszerét használja egy külön mozgatható ablakban. A nameplate-runtime, a profiladatbázis és a mentett konfigurációs kulcsok nem kerültek AceDB-re át, így a korábbi profilok változatlanul használhatók.
+A konfigurációs ablak mozgatható és átméretezhető. Mérete globálisan mentődik, a beállítások pedig modulonként elkülönített szekciókban jelennek meg.
 
-## Konfigurációs struktúra
+### Szerkezet
 
 - **General**
-  - General — globális megjelenítési beállítások és a küldetések reputációs jutalmának kijelzése
-  - Profiles — profil mentése, betöltése, másolása, visszaállítása és törlése
+  - General – nyelv, minimap, Blizzard Tweaks és Quest Tweaks
+  - Profiles – profilok mentése, betöltése, másolása, resetje és törlése
 - **Nameplates**
   - General
   - Healthbar
@@ -34,51 +43,59 @@ A konfigurációs felület ebben a változatban az addon meglévő, bevált beá
 - **Addons**
   - WeakAuras
   - Dominos
-- **Debug** — profiler és CPU benchmark
+- **Debug**
+  - profiler és CPU benchmark
 
-## Custom Nameplates főkapcsoló
+## Nameplate layout és hitbox
 
-Kikapcsolásakor a custom healthbar, castbar, név, overlayek, buffok és debuffok egy blokkban leállnak. A változtatáshoz UI-újratöltés szükséges; a megjelenő párbeszédablakból azonnal elvégezhető a `/reload`, vagy visszavonható a változtatás.
+A general és target healthbar közös szélességet és magasságot használ. A Blizzard nameplate kattintható hitboxának szélessége és magassága külön állítható, ahogy a healthbar középpontjának hitboxon belüli X/Y eltolása is.
 
-## Kompatibilitás és profilok
+A **Show nameplate layout preview** egy mozgatható próbaelrendezést jelenít meg general és target nameplate-tel, hitboxszal, borderrel, castbarral, overlayekkel, buffokkal és debuffokkal.
 
-A `s2k_EnhancementsDB` az első indításkor automatikusan átveszi a korábbi `s2k_NameplatesDB` profiljait. A régi globális API (`_G.s2k_Nameplates`) és a korábbi slash parancsok kompatibilitási aliasként megmaradnak.
+## Quest Tweaks
 
-Fő parancsok:
+Külön kapcsolható:
 
-```text
-/s2ke
-/s2ke config
-/s2ke help
-/s2ke dominos
-/s2kemod list
-/s2keprof list
-```
+- automatikus questelfogadás;
+- automatikus questleadás, jutalomválasztásnál megállva;
+- quest szintjének megjelenítése;
+- questobjective-ok és állapotuk mob- és item-tooltipben;
+- megosztott questkérelmek automatikus elfogadása;
+- reputációjutalmak megjelenítése;
+- minden, a Legion quest API által jelentett currencyjutalom megjelenítése.
+
+A reputáció- és currencyjutalmak dinamikusan méretezett blokkban kerülnek a quest részleteihez és a jutalomnézethez.
+
+## Dominos integráció
+
+Az integráció a Dominos által létrehozott action barokat kezeli. A kijelölt sávok átmenetileg vízszintesen vagy függőlegesen rendezhetők, szükség esetén több sorba vagy oszlopba törve. A Dominos mód visszaállítja az eredeti pozíciókat, docking kapcsolatokat és Show States értékeket.
+
+A frame strata action baronként menthető. Védett frame-ek harc közben nem módosulnak; a szükséges változtatások a harc végére halasztódnak. Az LDB vagy minimap ikon jobb gombja, illetve a /s2ke dominos parancs vált a Dominos és Editable mód között.
+
+## WeakAuras integráció
+
+A támogatott környezet WoW 7.3.5 és legalább WeakAuras 2.5.12. Az integráció addon-tulajdonú bridge anchorokat biztosít a target nameplate healthbarjához és castbarjához anélkül, hogy a WeakAuras csoportok felhasználói layout- és stílusbeállításait felülírná.
+
+## Profilok és kompatibilitás
+
+A profilok a s2k_EnhancementsDB SavedVariables adatbázisban tárolódnak. A korábbi s2k_NameplatesDB, a régi _G.s2k_Nameplates API és a korábbi slash parancsok kompatibilitási célból megmaradnak.
+
+A konfiguráció és a profilrendszer jelenleg saját implementáció; még nem használ AceConfig, AceGUI vagy AceDB könyvtárat.
+
+## Fő parancsok
+
+    /s2ke
+    /s2ke config
+    /s2ke help
+    /s2ke dominos
+    /s2kemod list
+    /s2keprof list
 
 ## Telepítés
 
-1. Töröld vagy nevezd át a korábbi `Interface/AddOns/s2k_Nameplates` mappát.
-2. Másold a ZIP-ben található `s2k_Enhancements` mappát az `Interface/AddOns/` könyvtárba.
-3. Indítsd újra a klienst vagy használd a `/reload` parancsot.
-4. StatBlockCore vagy más LDB host használatakor engedélyezd az `s2k:Enhancements` broker objektum megjelenítését.
+1. Töröld vagy nevezd át a korábbi Interface/AddOns/s2k_Nameplates mappát.
+2. Másold a release ZIP-ben található s2k_Enhancements mappát az Interface/AddOns/ könyvtárba.
+3. Indítsd újra a klienst vagy használd a /reload parancsot.
+4. LDB host használatakor engedélyezd az s2k:Enhancements launcher megjelenítését.
 
-## Resizable standalone configuration (1.16.3)
-
-The LDB-opened configuration window can be resized with the grip in its bottom-right corner. The left navigation remains fixed-width; only the settings workspace changes size. Internal tab buttons wrap according to the available width, scrollable pages expand vertically and horizontally, long descriptions reflow, and the WeakAuras progress-group editor uses a compact two-line row layout when space is limited. The last window size is stored in the account-wide SavedVariables root. Live resizing uses a throttled, visible-panel-only layout pass, so dragging the resize grip no longer rebuilds every hidden settings page on every pixel change.
-
-
-## Minimap launcher
-
-The addon provides both an LDB launcher and a draggable minimap icon. Minimap visibility is controlled under General > General and is stored globally rather than per profile. The existing profile manager is available under General > Profiles.
-
-## Dominos integration
-
-Az **Addons > Dominos** panel a Dominos által ténylegesen létrehozott action barok számát olvassa ki, ezért a lista nincs fixen tíz sávra korlátozva. Minden sávnál csak azt kell megadni, hogy részt vegyen-e az ideiglenes szerkesztési elrendezésben.
-
-- **Dominos:** a Dominos saját, normál pozíciói, docking kapcsolatai és Show States feltételei aktívak. Az s2k ebben az állapotban nem rendezi át a sávokat.
-- **Editable:** a kijelölt sávok aktuális Dominos-pozíciója és Show States értéke átmenetileg elmentődik, a Show States kiürül, majd a sávok számsorrendben egymás mellé vagy egymás alá rendeződnek. Ha az egyetlen sor vagy oszlop teljes egészében elfér, a legkisebb sorszámú kijelölt sáv az eredeti helyén marad. Ha nem fér el, a vízszintes elrendezés automatikusan új sorokba, a függőleges elrendezés új oszlopokba törik; az első sáv a bal, illetve a felső képernyőszélről indul. A számítás a Dominos sávok tényleges, skálázott méretét használja.
-- Dominos módba visszatérve, illetve az integráció kikapcsolásakor minden elmentett Dominos-pozíció, docking kapcsolat és Show States automatikusan visszaáll.
-- Harc közben a védett action-bar frame-ek nem módosulnak; a változtatás a harc végén automatikusan lefut.
-- Az integráció alapértelmezetten ki van kapcsolva, így meglévő Dominos-elrendezést nem változtat meg engedély nélkül.
-
-Ha a Dominos integráció engedélyezve van, a Dominos kompatibilis és legalább egy action bar Anchored jelölést kapott, az LDB vagy minimap ikon jobb gombos kattintása közvetlenül vált a **Dominos** és **Editable** mód között. A tooltip kijelzi az aktuális állapotot és a következő jobb gombos műveletet. Ugyanez elérhető a `/s2ke dominos` paranccsal.
+A release ZIP legfelső könyvtára mindig s2k_Enhancements.
