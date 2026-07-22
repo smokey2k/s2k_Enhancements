@@ -37,6 +37,14 @@ DEFAULTS = {
 
     -- Quest enhancements.
     questReputationEnabled = true,
+    questCurrencyRewardsEnabled = true,
+    questAutoAcceptEnabled = false,
+    questAutoTurnInEnabled = false,
+    questLevelDisplayEnabled = false,
+    questObjectiveTooltipEnabled = false,
+    questAutoAcceptShareEnabled = false,
+    cameraDistanceMaxZoomFactor = 2.6,
+    spellQueueWindow = 400,
     addonLocale = "AUTO",
     -- Chat enhancements. Disabled by default to preserve Blizzard behavior.
     chatEnabled = false,
@@ -90,7 +98,12 @@ DEFAULTS = {
     -- Main custom nameplate
     plateWidth = 110,
     plateHeight = 12,
-    plateYOffset = 0,
+    plateYOffset = 0, -- legacy saved-variable compatibility
+    nameplateHitboxWidth = 110,
+    nameplateHitboxHeight = 45,
+    healthbarHitboxXOffset = 0,
+    healthbarHitboxYOffset = 0,
+    healthbarFrameStrata = "HIGH",
     healthTexture = "Interface\\TargetingFrame\\UI-StatusBar", -- legacy/custom fallback path
     healthTextureKey = "BLIZZARD_STATUSBAR",
     healthTexturePath = "Interface\\TargetingFrame\\UI-StatusBar",
@@ -129,6 +142,7 @@ DEFAULTS = {
     targetPlateWidth = 110,
     targetPlateHeight = 12,
     targetPlateYOffset = 0,
+    targetHealthbarFrameStrata = "HIGH",
     targetHealthTextureKey = 'BLIZZARD_STATUSBAR',
     targetHealthTexturePath = 'Interface/TargetingFrame/UI-StatusBar',
     targetHealthUseReactionColor = true,
@@ -161,6 +175,7 @@ DEFAULTS = {
     nameFontKey = "FRIZQT",
     nameFontPath = "Fonts\\FRIZQT__.TTF",
     nameFontOutlineKey = "OUTLINE",
+    nameOverlayFrameLevel = 36,
 
     -- HP ratio text
     hpRatioText = true,
@@ -208,6 +223,14 @@ DEFAULTS = {
     castbarBorderColorB = 0.00,
     castbarBorderColorA = 1.00,
     showCastbarSpellName = true,
+    castbarSpellNameFontSize = 10,
+    castbarSpellNameFontKey = "FRIZQT",
+    castbarSpellNameFontPath = "Fonts\\FRIZQT__.TTF",
+    castbarSpellNameFontOutlineKey = "OUTLINE",
+    castbarSpellNameColorR = 1.00,
+    castbarSpellNameColorG = 1.00,
+    castbarSpellNameColorB = 1.00,
+    castbarSpellNameColorA = 1.00,
     showCastbarIcon = false,
     castbarIconSize = 18,
     castbarIconGap = 2,
@@ -369,6 +392,8 @@ State = {
     configPanels = {},
     configNavButtons = {},
     configSelectedPanel = nil,
+    nameplatePreviewFrame = nil,
+    nameplatePreviewRequested = false,
     brokerInitialized = false,
     fontOptions = {},
     fontOptionsByKey = {},
@@ -424,6 +449,17 @@ FONT_OUTLINE_OPTIONS = {
     { key = "MONOCHROME",           label = "Monochrome",               flags = "MONOCHROME" },
     { key = "MONOCHROME_OUTLINE",   label = "Monochrome outline",       flags = "MONOCHROME,OUTLINE" },
     { key = "MONOCHROME_THICK",     label = "Monochrome thick outline", flags = "MONOCHROME,THICKOUTLINE" },
+}
+
+FRAME_STRATA_OPTIONS = {
+    { key = "BACKGROUND",        label = "Background" },
+    { key = "LOW",               label = "Low" },
+    { key = "MEDIUM",            label = "Medium" },
+    { key = "HIGH",              label = "High" },
+    { key = "DIALOG",            label = "Dialog" },
+    { key = "FULLSCREEN",         label = "Fullscreen" },
+    { key = "FULLSCREEN_DIALOG",  label = "Fullscreen dialog" },
+    { key = "TOOLTIP",            label = "Tooltip" },
 }
 
 LEVEL_OVERLAY_ALIGN_OPTIONS = {

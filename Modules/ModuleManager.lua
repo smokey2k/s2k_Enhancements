@@ -149,6 +149,11 @@ function S2KNP_RegisterBaseEvents()
     A:RegisterEvent("NAME_PLATE_UNIT_REMOVED")
     A:RegisterEvent("PLAYER_TARGET_CHANGED")
     A:RegisterEvent("PLAYER_REGEN_ENABLED")
+    A:RegisterEvent("QUEST_DETAIL")
+    A:RegisterEvent("QUEST_PROGRESS")
+    A:RegisterEvent("QUEST_COMPLETE")
+    A:RegisterEvent("QUEST_ACCEPT_CONFIRM")
+    A:RegisterEvent("QUEST_LOG_UPDATE")
 end
 
 function S2KNP_ApplyModuleEventSubscriptions()

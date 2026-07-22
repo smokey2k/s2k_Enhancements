@@ -6,6 +6,7 @@ function S2KNP_InitializeLoadedAddon(addonName)
     local name = tostring(addonName or ""):lower()
     if name == "blizzard_questui" and InitializeQuestReputation then
         InitializeQuestReputation()
+        if InitializeQuestTweaks then InitializeQuestTweaks() end
     elseif name == "weakauras" or name:match("^weakauras[%-%_%.]?") then
         RefreshWeakAurasRuntime(true)
     elseif name == "dominos" then
@@ -40,6 +41,8 @@ function S2KNP_OnEvent(self, event, arg1)
         if arg1 == ADDON_NAME then
             EnsureDatabase()
             if ApplySpellActivationOverlaySetting then ApplySpellActivationOverlaySetting() end
+            if ApplyCameraDistanceSetting then ApplyCameraDistanceSetting() end
+            if ApplySpellQueueWindowSetting then ApplySpellQueueWindowSetting() end
             if InitializeS2KBroker then InitializeS2KBroker() end
             if InitializeS2KMinimapIcon then InitializeS2KMinimapIcon() end
             if InitializeS2KInterfaceOptionsPanel then InitializeS2KInterfaceOptionsPanel() end
@@ -47,6 +50,7 @@ function S2KNP_OnEvent(self, event, arg1)
             RememberConfiguredFontPaths()
             SyncProfilerState()
             if InitializeQuestReputation then InitializeQuestReputation() end
+            if InitializeQuestTweaks then InitializeQuestTweaks() end
             if InitializeChatModule then InitializeChatModule() end
             S2KNP_ApplyModuleState()
         else
@@ -57,6 +61,10 @@ function S2KNP_OnEvent(self, event, arg1)
 
     S2KNP_InitializeDatabaseRuntime()
     local flags = State.runtimeFlags
+
+    if S2K_HandleQuestTweakEvent then
+        S2K_HandleQuestTweakEvent(event, arg1)
+    end
 
     if event == "PLAYER_REGEN_ENABLED" then
         if State.pendingOptionsApply then
@@ -73,10 +81,13 @@ function S2KNP_OnEvent(self, event, arg1)
 
     if event == "PLAYER_LOGIN" then
         if ApplySpellActivationOverlaySetting then ApplySpellActivationOverlaySetting() end
+        if ApplyCameraDistanceSetting then ApplyCameraDistanceSetting() end
+        if ApplySpellQueueWindowSetting then ApplySpellQueueWindowSetting() end
         if InitializeS2KBroker then InitializeS2KBroker() end
         if InitializeS2KMinimapIcon then InitializeS2KMinimapIcon() end
         if InitializeS2KInterfaceOptionsPanel then InitializeS2KInterfaceOptionsPanel() end
         if InitializeQuestReputation then InitializeQuestReputation() end
+        if InitializeQuestTweaks then InitializeQuestTweaks() end
         if InitializeChatModule then InitializeChatModule() end
         RebuildFontOptions()
         RebuildStatusBarTextureOptions()
@@ -92,6 +103,8 @@ function S2KNP_OnEvent(self, event, arg1)
 
     if event == "PLAYER_ENTERING_WORLD" then
         if ApplySpellActivationOverlaySetting then ApplySpellActivationOverlaySetting() end
+        if ApplyCameraDistanceSetting then ApplyCameraDistanceSetting() end
+        if ApplySpellQueueWindowSetting then ApplySpellQueueWindowSetting() end
         ApplyNameplateCVarSettings()
         S2KNP_ApplyModuleState()
         UpdateAll(true)
@@ -185,6 +198,7 @@ end
 
 function S2KNP_OnUpdate(self, elapsed)
     local flags = State.runtimeFlags
+
     if not flags or not flags.enabled then return end
 
     local profileStart = State.profilerActive and debugprofilestop()

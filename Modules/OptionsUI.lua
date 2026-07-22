@@ -557,6 +557,7 @@ function EnsureS2KConfigWindow()
         self.s2kLayoutTickerActive = nil
         self:SetScript("OnUpdate", nil)
         CloseOpenDropdownPopups()
+        if HideNameplatePreview then HideNameplatePreview() end
     end)
     frame:SetScript("OnSizeChanged", function(self, width, height)
         width = tonumber(width) or tonumber(self:GetWidth()) or 0
@@ -781,34 +782,20 @@ function SelectS2KConfigPanel(key, subPage)
 end
 
 function InitializeS2KInterfaceOptionsPanel()
-    if State.interfaceOptionsPanel or not InterfaceOptions_AddCategory then
-        return State.interfaceOptionsPanel
-    end
-
-    local panel = CreateFrame("Frame", "s2k_EnhancementsInterfaceOptionsPanel", UIParent)
-    panel.name = "s2k:Enhancements"
-
-    local openButton = CreateFrame("Button", panel:GetName() .. "OpenButton", panel, "UIPanelButtonTemplate")
-    openButton:SetSize(180, 24)
-    openButton:SetPoint("TOPLEFT", panel, "TOPLEFT", 16, -16)
-    openButton:SetText(S2K_L("Open settings"))
-    openButton:SetScript("OnClick", function()
-        if OpenS2KConfig then
-            OpenS2KConfig("general", "general")
-        end
-    end)
-
-    InterfaceOptions_AddCategory(panel)
-    State.interfaceOptionsPanel = panel
-    return panel
+    -- The addon uses a standalone configuration window. Registering even a
+    -- placeholder category through InterfaceOptions_AddCategory can taint the
+    -- Legion CompactRaidFrame profile cancel/apply path when Interface Options
+    -- is closed during combat. LDB, the minimap icon and /s2ke remain available.
+    State.interfaceOptionsPanel = nil
+    return nil
 end
-
 function OpenS2KConfig(panelKey, subPage)
     BuildOptionsPanel()
     local frame = EnsureS2KConfigWindow()
     frame:Show()
     frame:Raise()
     SelectS2KConfigPanel(panelKey or State.configSelectedPanel or "general", subPage)
+    if RefreshNameplatePreviewVisibility then RefreshNameplatePreviewVisibility() end
 end
 
 function CloseS2KConfig()
@@ -1063,6 +1050,8 @@ function MakeDropdown(parent, suffix, label, key, optionsOrGetter, x, y, width)
             SetStr("hpRatioFontPath", optionPath or "")
         elseif key == "nameFontKey" then
             SetStr("nameFontPath", optionPath or "")
+        elseif key == "castbarSpellNameFontKey" then
+            SetStr("castbarSpellNameFontPath", optionPath or "")
         elseif key == "levelOverlayFontKey" then
             SetStr("levelOverlayFontPath", optionPath or "")
         elseif key == "healthTextureKey" then
@@ -1092,7 +1081,7 @@ function MakeDropdown(parent, suffix, label, key, optionsOrGetter, x, y, width)
 
         if key == "addonLocale" then
             if ReloadUI then ReloadUI() end
-        elseif key == "hpRatioFontKey" or key == "hpRatioFontOutlineKey" or key == "nameFontKey" or key == "nameFontOutlineKey" or key == "levelOverlayFontKey" or key == "levelOverlayFontOutlineKey" then
+        elseif key == "hpRatioFontKey" or key == "hpRatioFontOutlineKey" or key == "nameFontKey" or key == "nameFontOutlineKey" or key == "levelOverlayFontKey" or key == "levelOverlayFontOutlineKey" or key == "castbarSpellNameFontKey" or key == "castbarSpellNameFontOutlineKey" then
             RequestTextFontRefresh()
         elseif key == "healthTextureKey" or key == "healthBackdropTextureKey" or key == "targetHealthTextureKey" or key == "targetHealthBackdropTextureKey" or key == "castbarTextureKey" or key == "castbarBackdropTextureKey" or key == "playerCastOverlaySparkTextureKey" then
             RequestStatusBarTextureRefresh()
@@ -1501,6 +1490,8 @@ function RefreshAllOptionsPanels()
 end
 
 function ApplyProfileSettingsNow()
+    if UpdateNameplatePreview then UpdateNameplatePreview() end
+
     if IsInCombat() then
         State.pendingOptionsApply = true
         State.pendingCVarApply = true
@@ -1508,6 +1499,8 @@ function ApplyProfileSettingsNow()
     end
 
     ApplyNameplateCVarSettings()
+    if ApplyCameraDistanceSetting then ApplyCameraDistanceSetting() end
+    if ApplySpellQueueWindowSetting then ApplySpellQueueWindowSetting() end
     if S2KNP_ApplyModuleState then S2KNP_ApplyModuleState() end
     if HideDisabledModuleVisuals then HideDisabledModuleVisuals() end
     RebuildFontOptions()
@@ -1772,6 +1765,7 @@ end
 
 -- Generic controls shared by all standalone option pages.
 function RequestTextFontRefresh()
+    if UpdateNameplatePreview then UpdateNameplatePreview() end
     if IsInCombat() then
         State.pendingOptionsApply = true
         return
@@ -1788,6 +1782,7 @@ function RequestTextFontRefresh()
 end
 
 function RequestColorRefresh()
+    if UpdateNameplatePreview then UpdateNameplatePreview() end
     if IsInCombat() then
         State.pendingOptionsApply = true
         return
@@ -1934,6 +1929,141 @@ function ShowCustomNameplatesReloadPopup(checkBox, oldValue, newValue)
     )
 end
 
+-- =========================================================
+-- Standalone custom nameplate layout preview
+-- =========================================================
+
+local PREVIEW_ICONS = {
+    "Interface\\Icons\\Spell_Holy_PowerWordShield", "Interface\\Icons\\Spell_Nature_LightningShield",
+    "Interface\\Icons\\Spell_Shadow_ShadowWordPain", "Interface\\Icons\\Spell_Fire_Fireball02",
+}
+
+local function PreviewTexture(isTarget, backdrop)
+    if isTarget and CFG.targetHealthbarOverride then
+        local key = backdrop and CFG.targetHealthBackdropTextureKey or CFG.targetHealthTextureKey
+        local path = backdrop and CFG.targetHealthBackdropTexturePath or CFG.targetHealthTexturePath
+        local option = GetStatusBarTextureOption(key, path)
+        return (option and option.path) or path or (backdrop and GetHealthBackdropTexturePath() or GetHealthTexturePath())
+    end
+    return backdrop and GetHealthBackdropTexturePath() or GetHealthTexturePath()
+end
+
+local function PreviewHealthColor(isTarget)
+    if isTarget and CFG.targetHealthbarOverride and not CFG.targetHealthUseReactionColor then return GetCustomColor("targetHealthColor", .85, .1, .1, 1) end
+    if not isTarget and not CFG.healthUseReactionColor then return GetCustomColor("healthColor", .85, .1, .1, 1) end
+    return .85, .1, .1, 1
+end
+
+local function NewPreviewAura(parent, icon)
+    local button = CreateAuraButton(parent)
+    button.icon:SetTexture(icon)
+    return button
+end
+
+local function NewPreviewPlate(parent, isTarget)
+    local p = {isTarget=isTarget}
+    p.hitbox = CreateFrame("Frame", nil, parent)
+    p.hitbox.bg = p.hitbox:CreateTexture(nil,"BACKGROUND"); p.hitbox.bg:SetAllPoints(); p.hitbox.bg:SetColorTexture(1,.82,.05,.13)
+    p.hitboxBorder = CreateBorder(p.hitbox)
+    p.hitboxLabel = p.hitbox:CreateFontString(nil,"OVERLAY","GameFontNormalSmall"); p.hitboxLabel:SetPoint("TOPLEFT",4,-3); p.hitboxLabel:SetTextColor(1,.85,.15)
+    p.root = CreateFrame("Frame",nil,p.hitbox); p.root:SetFrameLevel(100)
+    p.border = CreateBorder(p.root)
+    p.background = p.root:CreateTexture(nil,"BACKGROUND"); p.background:SetAllPoints()
+    p.health = CreateFrame("StatusBar",nil,p.root); p.health:SetAllPoints(); p.health:SetMinMaxValues(0,1); p.health:SetValue(isTarget and .64 or .82)
+    p.playerCastOverlay = CreateFrame("StatusBar",nil,p.root); p.playerCastOverlay:SetAllPoints(); p.playerCastOverlay:SetMinMaxValues(0,1); p.playerCastOverlay:SetValue(.56)
+    p.playerCastOverlaySpark = CreateFrame("Frame",nil,p.root); p.playerCastOverlaySpark.texture=p.playerCastOverlaySpark:CreateTexture(nil,"OVERLAY"); p.playerCastOverlaySpark.texture:SetAllPoints()
+    p.hpMarker=CreateFrame("Frame",nil,p.root); p.hpMarker.texture=p.hpMarker:CreateTexture(nil,"ARTWORK"); p.hpMarker.texture:SetAllPoints()
+    p.levelLayer=CreateFrame("Frame",nil,p.root); p.levelLayer:SetAllPoints(); p.levelText=p.levelLayer:CreateFontString(nil,"OVERLAY","GameFontNormalSmall"); p.levelText:SetText(isTarget and "110+" or "110")
+    p.nameLayer=CreateFrame("Frame",nil,p.root); p.nameLayer:SetAllPoints(); p.name=p.nameLayer:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
+    p.ratioLayer=CreateFrame("Frame",nil,p.root); p.ratioLayer:SetAllPoints(); p.ratio=p.ratioLayer:CreateFontString(nil,"OVERLAY","GameFontNormalSmall"); p.ratio:SetText(isTarget and "291.2" or "84.6")
+    p.cast=CreateFrame("StatusBar",nil,p.root); p.cast:SetMinMaxValues(0,1); p.cast:SetValue(isTarget and .68 or .42); p.cast.bg=p.cast:CreateTexture(nil,"BACKGROUND"); p.cast.bg:SetAllPoints()
+    p.castBorder=CreateBorder(p.cast); p.castText=p.cast:CreateFontString(nil,"OVERLAY","GameFontNormalSmall"); p.castText:SetText(S2K_L("Spell cast"))
+    p.castIconFrame=CreateFrame("Frame",nil,p.root); p.castIconFrame.icon=p.castIconFrame:CreateTexture(nil,"ARTWORK"); p.castIconFrame.icon:SetAllPoints(); p.castIconFrame.icon:SetTexture(PREVIEW_ICONS[4]); p.castIconFrame.icon:SetTexCoord(.08,.92,.08,.92); p.castIconFrame.border=CreateBorder(p.castIconFrame)
+    p.buffFrame=CreateFrame("Frame",nil,p.root); p.buffFrame.buttons={}; p.debuffFrame=CreateFrame("Frame",nil,p.root); p.debuffFrame.buttons={}
+    for i=1,4 do p.buffFrame.buttons[i]=NewPreviewAura(p.buffFrame,PREVIEW_ICONS[i]); p.debuffFrame.buttons[i]=NewPreviewAura(p.debuffFrame,PREVIEW_ICONS[5-i]) end
+    return p
+end
+
+local function PreviewMarker(p,w)
+    if not CFG.hpMarkerEnabled or (CFG.hpMarkerOnlyTarget and not p.isTarget) then p.hpMarker:Hide(); return end
+    local pct=math.max(0,math.min(100,tonumber(CFG.hpMarkerPercent) or 35)); local pos=w*pct/100; local mode=tostring(CFG.hpMarkerWidthMode or "LINE")
+    p.hpMarker:ClearAllPoints()
+    if mode=="LEFT_TO_ZERO" then p.hpMarker:SetPoint("TOPLEFT",p.health,"TOPLEFT"); p.hpMarker:SetPoint("BOTTOMLEFT",p.health,"BOTTOMLEFT"); p.hpMarker:SetWidth(math.max(1,pos))
+    elseif mode=="RIGHT_TO_END" then p.hpMarker:SetPoint("TOPLEFT",p.health,"TOPLEFT",pos,0); p.hpMarker:SetPoint("BOTTOMLEFT",p.health,"BOTTOMLEFT",pos,0); p.hpMarker:SetWidth(math.max(1,w-pos))
+    else p.hpMarker:SetPoint("TOP",p.health,"TOP",pos-w/2,0); p.hpMarker:SetPoint("BOTTOM",p.health,"BOTTOM",pos-w/2,0); p.hpMarker:SetWidth(math.max(1,tonumber(CFG.hpMarkerWidth) or 2)) end
+    local r,g,b,a=GetHPMarkerColor(); if CFG.hpMarkerUseBorderColor then if p.isTarget and CFG.targetHealthbarOverride then r,g,b=GetTargetBorderColor() else r,g,b=GetAllBorderColor() end end
+    p.hpMarker.texture:SetColorTexture(r,g,b,a); p.hpMarker:Show()
+end
+
+local function UpdatePreviewPlate(p,y,scale)
+    local hw=math.max(1,tonumber(CFG.nameplateHitboxWidth) or 110); local hh=math.max(1,tonumber(CFG.nameplateHitboxHeight) or 45); local w=math.max(1,tonumber(CFG.plateWidth) or 110); local h=math.max(1,tonumber(CFG.plateHeight) or 12)
+    p.hitbox:SetScale(scale); p.hitbox:ClearAllPoints(); p.hitbox:SetPoint("CENTER",p.hitbox:GetParent(),"CENTER",0,y/scale); p.hitbox:SetSize(hw,hh)
+    ApplyBorderVisual(p.hitboxBorder,"S2K_SOLID","Interface\\Buttons\\WHITE8X8",1,0,0,1,.82,.05,.9)
+    p.hitboxLabel:SetText(p.isTarget and S2K_L("Target nameplate") or S2K_L("General nameplate"))
+    p.root:ClearAllPoints(); p.root:SetPoint("CENTER",p.hitbox,"CENTER",tonumber(CFG.healthbarHitboxXOffset) or 0,tonumber(CFG.healthbarHitboxYOffset) or 0); p.root:SetSize(w,h)
+    ApplyStatusBarTexture(p.health,PreviewTexture(p.isTarget,false)); p.health:SetStatusBarColor(PreviewHealthColor(p.isTarget))
+    local br,bg,bb,ba; local target=p.isTarget and CFG.targetHealthbarOverride
+    if target then br,bg,bb,ba=GetCustomColor("targetHealthBackdropColor",0,0,0,.65) else br,bg,bb,ba=GetCustomColor("healthBackdropColor",0,0,0,CFG.healthBackgroundAlpha or .65) end
+    ApplyStatusBarBackdropTexture(p.background,PreviewTexture(p.isTarget,true),br,bg,bb,ba)
+    local tk=target and "targetBorderTextureKey" or "borderTextureKey"; local tp=target and "targetBorderTexturePath" or "borderTexturePath"; local sz=target and CFG.targetBorderSize or CFG.borderSize; local ins=target and CFG.targetBorderInset or CFG.borderInset; local off=target and CFG.targetBorderOffset or CFG.borderOffset
+    if target then br,bg,bb,ba=GetTargetBorderColor() else br,bg,bb,ba=GetAllBorderColor() end
+    ApplyBorderVisual(p.border,CFG[tk],GetConfiguredBorderTexturePath(tk,tp),sz,ins,off,br,bg,bb,ba)
+    ApplyStatusBarTexture(p.playerCastOverlay,GetHealthTexturePath()); p.playerCastOverlay:SetStatusBarColor(GetPlayerCastOverlayColor()); if p.isTarget and CFG.playerCastOverlayEnabled then p.playerCastOverlay:Show() else p.playerCastOverlay:Hide() end
+    p.playerCastOverlaySpark:ClearAllPoints(); p.playerCastOverlaySpark:SetPoint("CENTER",p.root,"LEFT",w*.56,0); p.playerCastOverlaySpark:SetSize(tonumber(CFG.playerCastOverlaySparkWidth) or 2,h); ApplyTexturePath(p.playerCastOverlaySpark.texture,GetPlayerCastOverlaySparkTexturePath()); p.playerCastOverlaySpark.texture:SetVertexColor(GetPlayerCastOverlaySparkColor()); if p.isTarget and CFG.playerCastOverlayEnabled and CFG.playerCastOverlaySparkEnabled then p.playerCastOverlaySpark:Show() else p.playerCastOverlaySpark:Hide() end
+    PreviewMarker(p,w)
+    p.ratio:ClearAllPoints(); p.ratio:SetPoint("CENTER",p.ratioLayer,"CENTER",0,tonumber(CFG.hpRatioYOffset) or 0); ApplyFontStringFont(p.ratio,CFG.hpRatioFontKey,CFG.hpRatioFontSize,CFG.hpRatioFontOutlineKey,CFG.hpRatioFontPath); p.ratio:SetTextColor(GetHPRatioColor()); if CFG.hpRatioText then p.ratio:Show() else p.ratio:Hide() end
+    p.name:SetText(p.isTarget and S2K_L("Target nameplate") or S2K_L("General nameplate")); p.name:ClearAllPoints(); p.name:SetPoint("BOTTOM",p.root,"TOP",0,tonumber(CFG.nameYOffset) or 4); ApplyFontStringFont(p.name,CFG.nameFontKey,CFG.nameFontSize,CFG.nameFontOutlineKey,CFG.nameFontPath); if CFG.showNames then p.name:Show() else p.name:Hide() end
+    ApplyFontStringFont(p.levelText,CFG.levelOverlayFontKey,CFG.levelOverlayFontSize,CFG.levelOverlayFontOutlineKey,CFG.levelOverlayFontPath); p.levelText:SetTextColor(GetLevelOverlayColor()); ApplyLevelOverlayAnchor(p.levelText,p.levelLayer,CFG.levelOverlayXOffset or 0,CFG.levelOverlayYOffset or 16); if CFG.levelOverlayEnabled then p.levelText:Show() else p.levelText:Hide() end
+    ApplyFontStringFont(p.castText,CFG.castbarSpellNameFontKey,CFG.castbarSpellNameFontSize,CFG.castbarSpellNameFontOutlineKey,CFG.castbarSpellNameFontPath); p.castText:SetTextColor(GetCastbarSpellNameColor()); ApplyStatusBarTexture(p.cast,GetCastbarTexturePath()); ApplyStatusBarBackdropTexture(p.cast.bg,GetCastbarBackdropTexturePath(),GetCastbarBackdropColor()); p.cast:SetStatusBarColor(GetCastbarColor()); PositionCastbar(p); if CFG.showCastbar then p.cast:Show() else p.cast:Hide() end; if CFG.showCastbar and CFG.showCastbarSpellName then p.castText:Show() else p.castText:Hide() end; if CFG.showCastbar and CFG.showCastbarIcon then p.castIconFrame:Show() else p.castIconFrame:Hide() end
+    PositionAuraFrame(p,"DEBUFF",4); PositionAuraButtons(p.debuffFrame,"DEBUFF",4); PositionAuraFrame(p,"BUFF",4); PositionAuraButtons(p.buffFrame,"BUFF",4); if CFG.debuffFrameEnabled then p.debuffFrame:Show() else p.debuffFrame:Hide() end; if CFG.buffFrameEnabled then p.buffFrame:Show() else p.buffFrame:Hide() end; for i=1,4 do p.debuffFrame.buttons[i]:Show(); p.buffFrame.buttons[i]:Show() end
+    SyncCustomFrameLevels(p)
+end
+
+local function AnimatePreviewPlayerCast(frame, elapsed)
+    local p = frame and frame.targetPreview
+    if not p or not CFG.playerCastOverlayEnabled then return end
+
+    p.previewCastProgress = ((p.previewCastProgress or 0) + (tonumber(elapsed) or 0) / 2.5) % 1
+    p.playerCastOverlay:SetValue(p.previewCastProgress)
+    p.playerCastOverlay:Show()
+
+    local width = math.max(1, tonumber(CFG.plateWidth) or 110)
+    p.playerCastOverlaySpark:ClearAllPoints()
+    p.playerCastOverlaySpark:SetPoint("CENTER", p.root, "LEFT", width * p.previewCastProgress, 0)
+end
+function EnsureNameplatePreview()
+    if State.nameplatePreviewFrame then return State.nameplatePreviewFrame end
+    local f=CreateFrame("Frame","s2k_EnhancementsNameplatePreview",UIParent); f:SetSize(760,600); f:SetPoint("CENTER",UIParent,"CENTER",0,40); f:SetFrameStrata("FULLSCREEN_DIALOG"); f:SetClampedToScreen(true); f:SetMovable(true); f:EnableMouse(true); f:RegisterForDrag("LeftButton"); f:SetScript("OnDragStart",function(self) self:StartMoving() end); f:SetScript("OnDragStop",function(self) self:StopMovingOrSizing() end)
+    f:SetBackdrop({bgFile="Interface\\DialogFrame\\UI-DialogBox-Background-Dark",edgeFile="Interface\\DialogFrame\\UI-DialogBox-Border",tile=true,tileSize=32,edgeSize=32,insets={left=11,right=12,top=12,bottom=11}}); f:SetBackdropColor(.02,.02,.02,.94)
+    local title=f:CreateFontString(nil,"OVERLAY","GameFontNormalLarge"); title:SetPoint("TOPLEFT",20,-18); title:SetText(S2K_L("Nameplate layout preview")); local close=CreateFrame("Button",nil,f,"UIPanelCloseButton"); close:SetPoint("TOPRIGHT",-7,-7); close:SetScript("OnClick",function() State.nameplatePreviewRequested=false; f:Hide(); if RefreshAllOptionsPanels then RefreshAllOptionsPanels() end end)
+    f.info=f:CreateFontString(nil,"OVERLAY","GameFontHighlightSmall"); f.info:SetPoint("TOP",0,-47); f.canvas=CreateFrame("Frame",nil,f); f.canvas:SetPoint("TOPLEFT",30,-68); f.canvas:SetPoint("BOTTOMRIGHT",-30,25); f.generalPreview=NewPreviewPlate(f.canvas,false); f.targetPreview=NewPreviewPlate(f.canvas,true); f:SetScript("OnUpdate",AnimatePreviewPlayerCast); f:Hide(); State.nameplatePreviewFrame=f; return f
+end
+
+function UpdateNameplatePreview()
+    local f=State.nameplatePreviewFrame; if not f or not f:IsShown() then return end
+    local hw=math.max(1,tonumber(CFG.nameplateHitboxWidth) or 110); local hh=math.max(1,tonumber(CFG.nameplateHitboxHeight) or 45); local scale=math.min(1,620/math.max(hw,tonumber(CFG.plateWidth) or 110),180/hh)
+    f.info:SetText(string.format(S2K_L("Hitbox: %d x %d   Healthbar: %d x %d   Offset: %d, %d"),hw,hh,tonumber(CFG.plateWidth) or 110,tonumber(CFG.plateHeight) or 12,tonumber(CFG.healthbarHitboxXOffset) or 0,tonumber(CFG.healthbarHitboxYOffset) or 0)); UpdatePreviewPlate(f.generalPreview,135,scale); UpdatePreviewPlate(f.targetPreview,-135,scale)
+end
+
+function SetNameplatePreviewShown(shown) State.nameplatePreviewRequested=shown and true or false; local f=EnsureNameplatePreview(); if State.nameplatePreviewRequested and State.configFrame and State.configFrame:IsShown() then f:Show(); UpdateNameplatePreview() else f:Hide() end end
+function RefreshNameplatePreviewVisibility() local show=State.nameplatePreviewRequested and State.configFrame and State.configFrame:IsShown(); if show then local f=EnsureNameplatePreview(); f:Show(); UpdateNameplatePreview() elseif State.nameplatePreviewFrame then State.nameplatePreviewFrame:Hide() end end
+function HideNameplatePreview() if State.nameplatePreviewFrame then State.nameplatePreviewFrame:Hide() end end
+function MakeNameplatePreviewCheckbox(parent, suffix, x, y)
+    x = math.max(32, tonumber(x) or 32)
+    local cb = CreateFrame("CheckButton", parent:GetName() .. suffix, parent, "InterfaceOptionsCheckButtonTemplate")
+    cb:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y)
+    local label = cb.Text or _G[cb:GetName() .. "Text"]
+    if label then label:SetText(S2K_L("Show nameplate layout preview")) end
+    cb.tooltipText = S2K_L("Show nameplate layout preview")
+    cb.tooltipRequirement = S2K_L("Shows a movable fake nameplate with its hitbox, castbar, overlays, buffs and debuffs while the settings window is open.")
+    cb:SetScript("OnClick", function(self)
+        SetNameplatePreviewShown(self:GetChecked() and true or false)
+    end)
+    cb.Refresh = function(self)
+        self:SetChecked(State.nameplatePreviewRequested and true or false)
+    end
+    return cb
+end
 function MakeCheckbox(parent, suffix, label, tip, key, x, y)
     x = math.max(32, tonumber(x) or 32)
     local cb = CreateFrame("CheckButton", parent:GetName() .. suffix, parent, "InterfaceOptionsCheckButtonTemplate")
@@ -2032,7 +2162,10 @@ function MakeSlider(parent, suffix, label, key, minValue, maxValue, step, x, y)
         end
 
         SetNum(key, value)
-        if key == "hpRatioFontSize" or key == "nameFontSize" or key == "levelOverlayFontSize" then
+        if key == "cameraDistanceMaxZoomFactor" and ApplyCameraDistanceSetting then
+            ApplyCameraDistanceSetting(true)
+        end
+        if key == "hpRatioFontSize" or key == "nameFontSize" or key == "levelOverlayFontSize" or key == "castbarSpellNameFontSize" then
             RequestTextFontRefresh()
         else
             RequestApply()
@@ -2611,6 +2744,54 @@ function BuildOptionsPanel()
         spellOverlayNote:SetText(S2K_L("Controls Blizzard's spell activation/proc overlay effects. The choice is saved globally and reapplied when the UI loads."))
         y = y - 54
 
+        AddControl(page, MakeSlider(content, "CameraDistanceMaxZoomFactor", "Maximum camera distance", "cameraDistanceMaxZoomFactor", 1.0, 2.6, 0.1, 32, y)); y = y - 50
+
+        local cameraDistanceNote = content:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+        cameraDistanceNote:SetPoint("TOPLEFT", content, "TOPLEFT", 32, y)
+        cameraDistanceNote:SetWidth(560)
+        cameraDistanceNote:SetJustifyH("LEFT")
+        cameraDistanceNote:SetText(S2K_L("Sets Blizzard's maximum camera zoom distance. Scroll the camera outward after changing it to reach the new limit."))
+        y = y - 54
+        AddControl(page, MakeSlider(content, "SpellQueueWindowSlider", "Spell queue window (ms)", "spellQueueWindow", 0, 400, 5, 32, y)); y = y - 50
+
+        local spellQueueRecommendation = content:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+        spellQueueRecommendation:SetPoint("TOPLEFT", content, "TOPLEFT", 32, y)
+        spellQueueRecommendation:SetWidth(560)
+        spellQueueRecommendation:SetJustifyH("LEFT")
+        spellQueueRecommendation.Refresh = function(self)
+            self:SetText(State.spellQueueRecommendationText or S2K_L("Press Detect latency to get a recommended starting value."))
+        end
+        AddControl(page, spellQueueRecommendation)
+        spellQueueRecommendation:Refresh()
+        y = y - 28
+
+        AddControl(page, MakeButton(content, "DetectSpellQueueLatency", "Detect latency", 32, y, 170, function()
+            local worldLatency = GetNetStats and tonumber(select(4, GetNetStats())) or nil
+            if not worldLatency then
+                State.spellQueueRecommendationText = S2K_L("World latency could not be detected.")
+            else
+                local recommended
+                if worldLatency <= 25 then recommended = 75
+                elseif worldLatency <= 50 then recommended = 100
+                elseif worldLatency <= 100 then recommended = 150
+                elseif worldLatency <= 150 then recommended = 225
+                else recommended = math.min(400, math.floor((worldLatency + 105) / 10) * 10) end
+                State.spellQueueRecommendationText = S2K_LF("World latency: %d ms. Recommended starting value: %d ms.", worldLatency, recommended)
+            end
+            spellQueueRecommendation:Refresh()
+        end)); y = y - 40
+        local spellQueueNote = content:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+        spellQueueNote:SetPoint("TOPLEFT", content, "TOPLEFT", 32, y)
+        spellQueueNote:SetWidth(560)
+        spellQueueNote:SetJustifyH("LEFT")
+        spellQueueNote:SetText(S2K_L("Controls how many milliseconds before the current spell finishes the client may queue the next spell."))
+        y = y - 54
+        y = SectionTitle(content, "Quest Tweaks", y)
+        AddControl(page, MakeCheckbox(content, "QuestAutoAcceptEnabled", "Automatically accept quests", "Automatically accepts quests when the quest detail panel opens.", "questAutoAcceptEnabled", 32, y)); y = y - 36
+        AddControl(page, MakeCheckbox(content, "QuestAutoTurnInEnabled", "Automatically turn in quests", "Completes finished quests automatically, but stops when a reward choice is required.", "questAutoTurnInEnabled", 32, y)); y = y - 36
+        AddControl(page, MakeCheckbox(content, "QuestLevelDisplayEnabled", "Show quest levels", "Adds quest levels to quest titles and supported Blizzard quest-log rows.", "questLevelDisplayEnabled", 32, y)); y = y - 36
+        AddControl(page, MakeCheckbox(content, "QuestObjectiveTooltipEnabled", "Show quest objectives in tooltips", "Shows matching active quest objectives and progress in mob and item tooltips.", "questObjectiveTooltipEnabled", 32, y)); y = y - 36
+        AddControl(page, MakeCheckbox(content, "QuestAutoAcceptShareEnabled", "Automatically accept shared quests", "Automatically accepts quest-sharing confirmation requests from group members.", "questAutoAcceptShareEnabled", 32, y)); y = y - 42
         AddControl(page, MakeCheckbox(
             content,
             "QuestReputationEnabled",
@@ -2621,6 +2802,15 @@ function BuildOptionsPanel()
             y
         )); y = y - 42
 
+        AddControl(page, MakeCheckbox(
+            content,
+            "QuestCurrencyRewardsEnabled",
+            "Show quest currency rewards",
+            "Lists every currency rewarded by the quest, including Garrison and Order Resources, in the quest details and completion panels.",
+            "questCurrencyRewardsEnabled",
+            32,
+            y
+        )); y = y - 42
         local questNote = content:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
         questNote:SetPoint("TOPLEFT", content, "TOPLEFT", 32, y)
         questNote:SetWidth(560)
@@ -2719,7 +2909,7 @@ function BuildOptionsPanel()
     -- Nameplates / General
     do
         local page, content = CreateOptionsSubPage(nameplatesPanel, "s2k_NameplatesOptionsNameplatesGeneralPage", "general")
-        local y = -16
+        local y = SectionTitle(content, "Blizzard nameplates", -16)
 
         AddControl(page, MakeCheckbox(content, "ModuleCustomNameplates", "Custom Nameplates", "Master switch for the entire custom nameplate system. Changing it requires a UI reload; disabling it restores the original Blizzard nameplate visuals after the reload.", "enabled", 16, y)); y = y - 34
 
@@ -2748,15 +2938,12 @@ function BuildOptionsPanel()
         cmd:SetText(S2K_L("Slash commands: /s2kemod list, /s2kemod off customnameplates, /s2kemod on customnameplates"))
         y = y - 50
 
-        y = SectionTitle(content, "Blizzard nameplate visuals", y)
         AddControl(page, MakeCheckbox(content, "HideBlizzard", "Hide Blizzard visual elements", "Sets Blizzard nameplate health/name/cast/aura visuals alpha to 0. Does not move or resize them.", "hideBlizzardVisuals", 16, y)); y = y - 36
         AddControl(page, MakeCheckbox(content, "NameplateAtBase", "Nameplates at unit feet / base", "Sets nameplateOtherAtBase CVar. In Legion this is global for non-self nameplates.", "nameplateAtBase", 16, y)); y = y - 48
 
-        y = SectionTitle(content, "Scale", y)
         AddControl(page, MakeSlider(content, "NameplateGlobalScale", "Global nameplate scale", "nameplateGlobalScale", 0.50, 2.00, 0.05, 32, y)); y = y - 50
         AddControl(page, MakeSlider(content, "NameplateSelectedScale", "Selected nameplate scale", "nameplateSelectedScale", 0.50, 2.50, 0.05, 32, y)); y = y - 56
 
-        y = SectionTitle(content, "Blizzard nameplate CVars", y)
         AddControl(page, MakeButton(content, "ResetNameplateCVars", "Reset CVars to defaults", 32, y, 190, function()
             ResetNameplateCVarSettingsToDefaults()
         end)); y = y - 42
@@ -2777,11 +2964,18 @@ function BuildOptionsPanel()
     -- Healthbar and border
     do
         local page, content = CreateOptionsSubPage(nameplatesPanel, "s2k_NameplatesOptionsHealthbarPage", "healthbar")
-        local y = SectionTitle(content, "General healthbar", -16)
+        local y = SectionTitle(content, "Shared healthbar and hitbox", -16)
 
-        AddControl(page, MakeSlider(content, "PlateWidth", "Healthbar width", "plateWidth", 50, 260, 1, 32, y)); y = y - 50
-        AddControl(page, MakeSlider(content, "PlateHeight", "Healthbar height", "plateHeight", 4, 40, 1, 32, y)); y = y - 50
-        AddControl(page, MakeSlider(content, "PlateYOffset", "Healthbar Y offset", "plateYOffset", -80, 80, 1, 32, y)); y = y - 54
+        AddControl(page, MakeSlider(content, "PlateWidth", "Healthbar width", "plateWidth", 50, 500, 1, 32, y)); y = y - 50
+        AddControl(page, MakeSlider(content, "PlateHeight", "Healthbar height", "plateHeight", 4, 80, 1, 32, y)); y = y - 50
+        AddControl(page, MakeSlider(content, "NameplateHitboxWidth", "Nameplate hitbox width", "nameplateHitboxWidth", 50, 500, 1, 32, y)); y = y - 50
+        AddControl(page, MakeSlider(content, "NameplateHitboxHeight", "Nameplate hitbox height", "nameplateHitboxHeight", 10, 200, 1, 32, y)); y = y - 50
+        AddControl(page, MakeSlider(content, "HealthbarHitboxXOffset", "Healthbar center X offset", "healthbarHitboxXOffset", -250, 250, 1, 32, y)); y = y - 50
+        AddControl(page, MakeSlider(content, "HealthbarHitboxYOffset", "Healthbar center Y offset", "healthbarHitboxYOffset", -100, 100, 1, 32, y)); y = y - 54
+        AddControl(page, MakeNameplatePreviewCheckbox(content, "NameplateLayoutPreview", 16, y)); y = y - 54
+
+        y = SectionTitle(content, "General healthbar appearance", y)
+        AddControl(page, MakeDropdown(content, "HealthbarFrameStrata", "Healthbar frame strata", "healthbarFrameStrata", FRAME_STRATA_OPTIONS, 32, y, 240)); y = y - 66
         AddControl(page, MakeDropdown(content, 'HealthTexture', 'Healthbar texture', 'healthTextureKey', GetStatusBarTextureOptions, 32, y, 240)); y = y - 66
         AddControl(page, MakeCheckbox(content, 'HealthUseReaction', 'Use unit reaction color', 'If enabled, healthbar color follows hostile/friendly/dead unit reaction colors. Disable this to use the custom color picker below.', 'healthUseReactionColor', 32, y)); y = y - 34
         AddControl(page, MakeColorButton(content, 'HealthColor', 'Custom healthbar color', 'healthColor', 32, y, 200)); y = y - 70
@@ -2795,10 +2989,10 @@ function BuildOptionsPanel()
         AddControl(page, MakeColorButton(content, "BorderColor", "All nameplates border color", "borderColor", 32, y, 220)); y = y - 70
         y = SectionTitle(content, 'Target healthbar', y)
         AddControl(page, MakeCheckbox(content, 'ModuleTargetRuntimeHealth', 'Target health runtime tick', 'Extra throttled target-health refresh on OnUpdate. Disable it for maximum CPU saving if UNIT_HEALTH works reliably on the server.', 'moduleTargetRuntimeHealthEnabled', 16, y)); y = y - 42
-        AddControl(page, MakeCheckbox(content, 'TargetHealthbarOverride', 'Use separate target healthbar', 'If enabled, the current target uses every setting in this target healthbar section instead of the general healthbar settings.', 'targetHealthbarOverride', 16, y)); y = y - 42
-        AddControl(page, MakeSlider(content, 'TargetPlateWidth', 'Healthbar width', 'targetPlateWidth', 50, 260, 1, 32, y)); y = y - 50
-        AddControl(page, MakeSlider(content, 'TargetPlateHeight', 'Healthbar height', 'targetPlateHeight', 4, 40, 1, 32, y)); y = y - 50
-        AddControl(page, MakeSlider(content, 'TargetPlateYOffset', 'Healthbar Y offset', 'targetPlateYOffset', -80, 80, 1, 32, y)); y = y - 54
+        AddControl(page, MakeCheckbox(content, 'TargetHealthbarOverride', 'Use separate target healthbar', 'If enabled, the current target uses the appearance settings in this section. Healthbar size and hitbox placement remain shared.', 'targetHealthbarOverride', 16, y)); y = y - 42
+
+
+        AddControl(page, MakeDropdown(content, 'TargetHealthbarFrameStrata', 'Target healthbar frame strata', 'targetHealthbarFrameStrata', FRAME_STRATA_OPTIONS, 32, y, 240)); y = y - 66
         AddControl(page, MakeDropdown(content, 'TargetHealthTexture', 'Healthbar texture', 'targetHealthTextureKey', GetStatusBarTextureOptions, 32, y, 240)); y = y - 66
         AddControl(page, MakeCheckbox(content, 'TargetHealthUseReaction', 'Use unit reaction color', 'If enabled, the target healthbar follows hostile/friendly/dead unit reaction colors. Disable this to use the custom target color below.', 'targetHealthUseReactionColor', 32, y)); y = y - 34
         AddControl(page, MakeColorButton(content, 'TargetHealthColor', 'Custom healthbar color', 'targetHealthColor', 32, y, 200)); y = y - 70
@@ -2830,6 +3024,10 @@ function BuildOptionsPanel()
         AddControl(page, MakeSlider(content, 'CastbarBorderOffset', 'Castbar border offset', 'castbarBorderOffset', 0, 32, 1, 32, y)); y = y - 56
         AddControl(page, MakeColorButton(content, "CastbarBorderColor", "Castbar border color", "castbarBorderColor", 32, y, 220)); y = y - 70
         AddControl(page, MakeCheckbox(content, "ShowCastbarSpellName", "Show castbar spell name", "Shows the spell name text on the custom castbar.", "showCastbarSpellName", 16, y)); y = y - 32
+        AddControl(page, MakeDropdown(content, "CastbarSpellNameFont", "Castbar spell name font", "castbarSpellNameFontKey", GetFontOptions, 32, y, 240)); y = y - 62
+        AddControl(page, MakeSlider(content, "CastbarSpellNameFontSize", "Castbar spell name font size", "castbarSpellNameFontSize", 6, 24, 1, 32, y)); y = y - 50
+        AddControl(page, MakeDropdown(content, "CastbarSpellNameOutline", "Castbar spell name font outline", "castbarSpellNameFontOutlineKey", FONT_OUTLINE_OPTIONS, 32, y, 240)); y = y - 66
+        AddControl(page, MakeColorButton(content, "CastbarSpellNameColor", "Castbar spell name color", "castbarSpellNameColor", 32, y, 220)); y = y - 70
         AddControl(page, MakeCheckbox(content, "ShowCastbarIcon", "Show custom castbar icon", "Shows the spell icon next to the custom castbar.", "showCastbarIcon", 16, y)); y = y - 40
         AddControl(page, MakeSlider(content, "CastbarIconSize", "Castbar icon size", "castbarIconSize", 8, 40, 1, 32, y)); y = y - 50
         AddControl(page, MakeSlider(content, "CastbarIconGap", "Castbar icon gap", "castbarIconGap", 0, 20, 1, 32, y)); y = y - 60
@@ -2849,6 +3047,7 @@ function BuildOptionsPanel()
         y = SectionTitle(content, "Unit name overlay", y)
         AddControl(page, MakeSlider(content, "NameFontSize", "Name font size", "nameFontSize", 6, 24, 1, 32, y)); y = y - 50
         AddControl(page, MakeSlider(content, "NameYOffset", "Name Y offset", "nameYOffset", -60, 40, 1, 32, y)); y = y - 55
+        AddControl(page, MakeSlider(content, "NameOverlayFrameLevel", "Unit name overlay frame level", "nameOverlayFrameLevel", 1, 100, 1, 32, y)); y = y - 56
         AddControl(page, MakeDropdown(content, "NameFont", "Unit name font", "nameFontKey", GetFontOptions, 32, y, 240)); y = y - 62
         AddControl(page, MakeDropdown(content, "NameOutline", "Unit name font outline", "nameFontOutlineKey", FONT_OUTLINE_OPTIONS, 32, y, 240)); y = y - 70
 

@@ -150,7 +150,7 @@ function SyncCustomFrameLevels(ctx)
     end
 
     if ctx.nameLayer and ctx.nameLayer.SetFrameLevel then
-        ctx.nameLayer:SetFrameLevel(base + 61)
+        ctx.nameLayer:SetFrameLevel(base + (tonumber(CFG.nameOverlayFrameLevel) or 36))
     end
 
     if ctx.debuffFrame and ctx.debuffFrame.SetFrameLevel then
@@ -159,6 +159,39 @@ function SyncCustomFrameLevels(ctx)
 
     if ctx.buffFrame and ctx.buffFrame.SetFrameLevel then
         ctx.buffFrame:SetFrameLevel(base + 41)
+    end
+end
+
+local VALID_NAMEPLATE_FRAME_STRATA = {
+    BACKGROUND = true,
+    LOW = true,
+    MEDIUM = true,
+    HIGH = true,
+    DIALOG = true,
+    FULLSCREEN = true,
+    FULLSCREEN_DIALOG = true,
+    TOOLTIP = true,
+}
+
+function GetNameplateFrameStrata(ctx)
+    local key = IsTargetUnit(ctx and ctx.unit) and "targetHealthbarFrameStrata" or "healthbarFrameStrata"
+    local strata = tostring(CFG[key] or "HIGH"):upper()
+    return VALID_NAMEPLATE_FRAME_STRATA[strata] and strata or "HIGH"
+end
+
+function SyncCustomFrameStrata(ctx)
+    if not ctx or not ctx.root or not ctx.root.SetFrameStrata then return end
+
+    local strata = GetNameplateFrameStrata(ctx)
+    if ctx.s2kLastFrameStrata ~= strata then
+        ctx.root:SetFrameStrata(strata)
+        if ctx.waHealthAnchor and ctx.waHealthAnchor.SetFrameStrata then
+            ctx.waHealthAnchor:SetFrameStrata(strata)
+        end
+        if ctx.waCastAnchor and ctx.waCastAnchor.SetFrameStrata then
+            ctx.waCastAnchor:SetFrameStrata(strata)
+        end
+        ctx.s2kLastFrameStrata = strata
     end
 end
 
@@ -209,9 +242,13 @@ function CreateNameplateContext(unit, plate)
     local healthName = plateName and (plateName .. "S2KHealthBar") or nil
     local castName = plateName and (plateName .. "S2KCastBar") or nil
 
-    local root = CreateFrame("Frame", rootName, plate)
-    root:SetFrameStrata("HIGH")
+    -- Keep the visual root under UIParent so its configured frame strata is not
+    -- clamped by the Blizzard nameplate parent. PositionRoot still anchors it
+    -- to the recycled Blizzard healthbar/nameplate.
+    local root = CreateFrame("Frame", rootName, UIParent)
+    root:SetFrameStrata(GetNameplateFrameStrata(ctx))
     root:SetFrameLevel((plate.GetFrameLevel and plate:GetFrameLevel() or 0) + 100)
+    root:Hide()
     ctx.root = root
     root.s2kNameplateContext = ctx
 
@@ -317,14 +354,14 @@ function CreateNameplateContext(unit, plate)
     local waCastAnchorName = plateName and (plateName .. "S2KWACastAnchor") or nil
 
     local waHealthAnchor = CreateFrame("Frame", waHealthAnchorName, UIParent)
-    waHealthAnchor:SetFrameStrata("HIGH")
+    waHealthAnchor:SetFrameStrata(GetNameplateFrameStrata(ctx))
     waHealthAnchor:SetFrameLevel(900)
     waHealthAnchor:Hide()
     waHealthAnchor.s2kNameplateContext = ctx
     ctx.waHealthAnchor = waHealthAnchor
 
     local waCastAnchor = CreateFrame("Frame", waCastAnchorName, UIParent)
-    waCastAnchor:SetFrameStrata("HIGH")
+    waCastAnchor:SetFrameStrata(GetNameplateFrameStrata(ctx))
     waCastAnchor:SetFrameLevel(901)
     waCastAnchor:Hide()
     waCastAnchor.s2kNameplateContext = ctx
@@ -334,7 +371,8 @@ function CreateNameplateContext(unit, plate)
     castText:SetPoint("CENTER", cast, "CENTER", 0, 0)
     castText:SetJustifyH("CENTER")
     castText:SetJustifyV("MIDDLE")
-    castText:SetTextColor(1, 1, 1, 1)
+    ApplyFontStringFont(castText, CFG.castbarSpellNameFontKey, CFG.castbarSpellNameFontSize, CFG.castbarSpellNameFontOutlineKey, CFG.castbarSpellNameFontPath)
+    castText:SetTextColor(GetCastbarSpellNameColor())
     castText:SetShadowColor(0, 0, 0, 1)
     castText:SetShadowOffset(1, -1)
     castText:Hide()
@@ -357,6 +395,7 @@ function CreateNameplateContext(unit, plate)
     ctx.buffFrame = buffFrame
 
     SyncCustomFrameLevels(ctx)
+    SyncCustomFrameStrata(ctx)
 
     plate.s2kNameplateContext = ctx
     plate.s2kCustomRoot = root

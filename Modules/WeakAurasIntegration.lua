@@ -190,23 +190,6 @@ function SafeHideFrame(frame)
     end
 end
 
-function RaiseWeakAuraRegion(region, anchorFrame, offset)
-    if not region or not anchorFrame then
-        return
-    end
-
-    offset = offset or 30
-
-    SafeCall(function()
-        if region.SetFrameStrata and anchorFrame.GetFrameStrata then
-            region:SetFrameStrata(anchorFrame:GetFrameStrata())
-        end
-        if region.SetFrameLevel and anchorFrame.GetFrameLevel then
-            region:SetFrameLevel(anchorFrame:GetFrameLevel() + offset)
-        end
-    end)
-end
-
 function AnchorWeakAuraToTarget(region, ctx)
     if not region or not ctx or not ctx.health or not FrameIsVisible(ctx.health) then
         return false
@@ -234,7 +217,6 @@ function AnchorWeakAuraToTarget(region, ctx)
         region:SetPoint("BOTTOMRIGHT", bottomAnchor, "BOTTOMRIGHT", 0, 0)
     end)
 
-    RaiseWeakAuraRegion(region, healthAnchor, 35)
     SafeShowFrame(region)
     return true
 end
@@ -258,7 +240,6 @@ function AnchorWeakAuraToFallback(region)
         region:SetPoint("BOTTOMRIGHT", fallback, "BOTTOMRIGHT", 0, 0)
     end)
 
-    RaiseWeakAuraRegion(region, fallback, 35)
     SafeShowFrame(region)
     return true
 end

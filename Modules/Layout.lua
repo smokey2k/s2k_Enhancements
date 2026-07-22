@@ -42,6 +42,15 @@ function ApplyCustomPlateScale(ctx)
     end
 
     local desiredScale = GetCustomPlateScale(ctx)
+
+    -- UIParent-parented roots do not inherit the Blizzard nameplate scale.
+    -- Their local scale is therefore already the desired effective scale.
+    if ctx.root.GetParent and ctx.root:GetParent() == UIParent then
+        ctx.s2kLastSafeLocalScale = desiredScale
+        ctx.root:SetScale(desiredScale)
+        return
+    end
+
     local inheritedScale = GetFrameScaleRelativeToUI(ctx.plate)
     local localScale = nil
 
@@ -116,20 +125,22 @@ function PositionRoot(ctx)
     local blizzHB = uf and GetHealthBarFromUF(uf)
 
     local useTarget = CFG.targetHealthbarOverride and IsTargetUnit(ctx.unit)
-    local plateWidth = useTarget and CFG.targetPlateWidth or CFG.plateWidth
-    local plateHeight = useTarget and CFG.targetPlateHeight or CFG.plateHeight
-    local plateYOffset = useTarget and CFG.targetPlateYOffset or CFG.plateYOffset
+    local plateWidth = tonumber(CFG.plateWidth) or 110
+    local plateHeight = tonumber(CFG.plateHeight) or 12
+    local xOffset = tonumber(CFG.healthbarHitboxXOffset) or 0
+    local yOffset = tonumber(CFG.healthbarHitboxYOffset) or 0
 
     root:ClearAllPoints()
-    if blizzHB and blizzHB.GetObjectType then
-        root:SetPoint("CENTER", blizzHB, "CENTER", 0, plateYOffset or 0)
-    else
-        root:SetPoint("CENTER", plate, "CENTER", 0, plateYOffset or 0)
+    if plate and plate.GetObjectType then
+        root:SetPoint("CENTER", plate, "CENTER", xOffset, yOffset)
+    elseif blizzHB and blizzHB.GetObjectType then
+        root:SetPoint("CENTER", blizzHB, "CENTER", xOffset, yOffset)
     end
 
-    root:SetSize(plateWidth or 110, plateHeight or 12)
+    root:SetSize(plateWidth, plateHeight)
     ApplyStatusBarTexture(ctx.health, GetHealthTexturePath(ctx))
     ApplyCustomPlateScale(ctx)
+    SyncCustomFrameStrata(ctx)
 
     if root.SetFrameLevel then
         local level = 0

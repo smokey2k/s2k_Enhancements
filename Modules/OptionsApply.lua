@@ -120,10 +120,70 @@ function SetSpellActivationOverlaysEnabled(enabled)
     end
 end
 
+function ApplySpellQueueWindowSetting()
+    local value = math.max(0, math.min(400, tonumber(CFG.spellQueueWindow) or 400))
+    if SetCVar then
+        pcall(SetCVar, "SpellQueueWindow", tostring(math.floor(value + 0.5)))
+    end
+    return value
+end
+local function WriteCameraDistanceSetting(value)
+    local cvarName = "cameraDistanceMaxZoomFactor"
+    local textValue = string.format("%.1f", tonumber(value) or 2.6)
+
+    if SetCVar then pcall(SetCVar, cvarName, textValue) end
+    local actual = GetCVar and tonumber(GetCVar(cvarName)) or nil
+
+    if (not actual or math.abs(actual - value) > 0.001) and C_CVar and type(C_CVar.SetCVar) == "function" then
+        pcall(C_CVar.SetCVar, cvarName, textValue)
+        actual = GetCVar and tonumber(GetCVar(cvarName)) or actual
+    end
+    if (not actual or math.abs(actual - value) > 0.001) and ConsoleExec then
+        pcall(ConsoleExec, cvarName .. " " .. textValue)
+        actual = GetCVar and tonumber(GetCVar(cvarName)) or actual
+    end
+
+    State.cameraDistanceAppliedValue = actual
+    return actual
+end
+
+local function RefreshCameraDistanceLimit(forceClamp)
+    -- Legion can keep the current camera outside a newly lowered maximum.
+    -- User-driven slider changes deliberately traverse the complete zoom range
+    -- so the engine clamps against the new limit immediately.
+    if CameraZoomIn and CameraZoomOut then
+        if forceClamp then
+            pcall(CameraZoomIn, 1000)
+            pcall(CameraZoomOut, 1000)
+        else
+            pcall(CameraZoomIn, 0.01)
+            pcall(CameraZoomOut, 0.01)
+        end
+    end
+end
+function ApplyCameraDistanceSetting(forceClamp)
+    local value = math.max(1.0, math.min(2.6, tonumber(CFG.cameraDistanceMaxZoomFactor) or 2.6))
+    WriteCameraDistanceSetting(value)
+    RefreshCameraDistanceLimit(forceClamp)
+
+    State.cameraDistanceApplyGeneration = (State.cameraDistanceApplyGeneration or 0) + 1
+    local generation = State.cameraDistanceApplyGeneration
+    if C_Timer and C_Timer.After then
+        C_Timer.After(0.10, function()
+            if State.cameraDistanceApplyGeneration == generation then WriteCameraDistanceSetting(value); RefreshCameraDistanceLimit() end
+        end)
+        C_Timer.After(0.50, function()
+            if State.cameraDistanceApplyGeneration == generation then WriteCameraDistanceSetting(value); RefreshCameraDistanceLimit() end
+        end)
+    end
+    return value
+end
 function ApplyOptionsNow()
     State.pendingOptionsApply = false
     SyncProfilerState()
     ApplyNameplateCVarSettings()
+    ApplyCameraDistanceSetting()
+    ApplySpellQueueWindowSetting()
     if S2KNP_ApplyModuleState then S2KNP_ApplyModuleState() end
     UpdateAll(true)
     if ScheduleNameplateScaleStabilization then
@@ -135,12 +195,17 @@ function ApplyOptionsNow()
     if RefreshQuestReputationDisplay then
         RefreshQuestReputationDisplay()
     end
+    if RefreshQuestTweaksDisplay then
+        RefreshQuestTweaksDisplay()
+    end
     if ApplyChatSettings then
         ApplyChatSettings()
     end
 end
 
 function RequestApply()
+    if UpdateNameplatePreview then UpdateNameplatePreview() end
+
     -- UI changes are saved immediately, but the expensive/live application of
     -- options is deferred while in combat. Runtime combat updates continue to
     -- use the already active layout, avoiding accidental protected-frame work

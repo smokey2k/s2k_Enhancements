@@ -1,3 +1,17 @@
+# s2k:Enhancements 1.19.0
+
+- Fixed custom castbar spell names disappearing after an enemy's first cast.
+- Added configurable frame strata for general and target healthbars; connected castbars, overlays, buffs and debuffs inherit their healthbar's strata, while overlay frame levels remain independently configurable.
+- Improved custom nameplate layering so unrelated WeakAuras groups respect the configured nameplate strata.
+- Unified general and target healthbar dimensions and added configurable Blizzard nameplate hitbox width, height and healthbar position within the hitbox.
+- Added a movable, animated two-nameplate layout preview showing general and target healthbars, hitboxes, borders, castbars, overlays, buffs and debuffs.
+- Added font, size, outline and color controls for castbar spell names.
+- Consolidated Blizzard nameplate controls into a single General section.
+- Added maximum camera-distance and SpellQueueWindow controls, including world-latency detection and a recommended SpellQueueWindow starting value.
+- Added optional automatic quest acceptance, automatic completion without automatic reward selection, quest-level labels, quest-objective tooltip progress and automatic handling of shared-quest requests.
+- Added optional quest currency reward display for every currency reported by the Legion quest API, including Garrison and Order Resources, with dynamically sized quest reward content.
+- Removed the Blizzard Interface Options registration that could taint Compact Raid Frame profile handling; the standalone LDB, minimap and slash-command configuration entry points remain available.
+
 # s2k:Enhancements 1.18.18-healthbar-color-layout
 
 - Moved the reaction-color controls next to and before their corresponding custom healthbar color pickers in both general and target sections.

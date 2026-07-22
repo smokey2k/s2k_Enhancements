@@ -224,6 +224,10 @@ function GetHealthBackdropColor(ctx)
     return GetCustomColor('healthBackdropColor', 0.00, 0.00, 0.00, CFG.healthBackgroundAlpha or 0.65)
 end
 
+function GetCastbarSpellNameColor()
+    return GetCustomColor("castbarSpellNameColor", 1.00, 1.00, 1.00, 1.00)
+end
+
 function GetCastbarBackdropColor()
     return GetCustomColor('castbarBackdropColor', 0.00, 0.00, 0.00, 0.75)
 end
@@ -305,6 +309,20 @@ function ApplyNameplateBaseCVar()
     SetCVarIfChanged("nameplateOtherAtBase", value)
 end
 
+function ApplyNameplateHitboxSize()
+    if not C_NamePlate then return end
+
+    local width = math.max(1, tonumber(CFG.nameplateHitboxWidth) or 110)
+    local height = math.max(1, tonumber(CFG.nameplateHitboxHeight) or 45)
+
+    if C_NamePlate.SetNamePlateEnemySize then
+        pcall(C_NamePlate.SetNamePlateEnemySize, width, height)
+    end
+    if C_NamePlate.SetNamePlateFriendlySize then
+        pcall(C_NamePlate.SetNamePlateFriendlySize, width, height)
+    end
+end
+
 function ApplyNameplateCVarSettings()
     if InCombatLockdown and InCombatLockdown() then
         State.pendingCVarApply = true
@@ -313,6 +331,7 @@ function ApplyNameplateCVarSettings()
 
     State.pendingCVarApply = false
     ApplyNameplateBaseCVar()
+    ApplyNameplateHitboxSize()
 
     for key, def in pairs(CVAR_OPTION_DEFS) do
         local value = tonumber(CFG[key])

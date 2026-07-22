@@ -157,6 +157,21 @@ function CopyDefaults()
         DB.targetHealthbarV1Migrated = true
     end
 
+    if not DB.unifiedHealthbarSizeV1Migrated then
+        local generalWidth = tonumber(DB.plateWidth) or tonumber(DEFAULTS.plateWidth) or 110
+        local targetWidth = tonumber(DB.targetPlateWidth) or generalWidth
+        local generalHeight = tonumber(DB.plateHeight) or tonumber(DEFAULTS.plateHeight) or 12
+        local targetHeight = tonumber(DB.targetPlateHeight) or generalHeight
+
+        DB.plateWidth = generalWidth
+        DB.plateHeight = generalHeight
+        DB.nameplateHitboxWidth = tonumber(DB.nameplateHitboxWidth) or math.max(generalWidth, targetWidth)
+        DB.nameplateHitboxHeight = tonumber(DB.nameplateHitboxHeight) or math.max(45, generalHeight, targetHeight)
+        DB.healthbarHitboxXOffset = tonumber(DB.healthbarHitboxXOffset) or 0
+        DB.healthbarHitboxYOffset = tonumber(DB.healthbarHitboxYOffset) or tonumber(DB.plateYOffset) or 0
+        DB.unifiedHealthbarSizeV1Migrated = true
+    end
+
     -- Rebuild CFG from the active profile every time. Do not leave stale values
     -- from the previously active profile in memory. This matters when older
     -- profiles do not contain a key that newer builds added later.

@@ -46,7 +46,7 @@ function UpdateName(ctx)
 
     ApplyFontStringFont(ctx.name, CFG.nameFontKey, CFG.nameFontSize, CFG.nameFontOutlineKey, CFG.nameFontPath)
     if ctx.nameLayer and ctx.nameLayer.SetFrameLevel and ctx.root and ctx.root.GetFrameLevel then
-        ctx.nameLayer:SetFrameLevel((ctx.root:GetFrameLevel() or 0) + 36)
+        ctx.nameLayer:SetFrameLevel((ctx.root:GetFrameLevel() or 0) + (tonumber(CFG.nameOverlayFrameLevel) or 36))
         ctx.nameLayer:Show()
     end
     if ctx.name.SetDrawLayer then
@@ -572,6 +572,11 @@ function HideCastbar(ctx)
         ctx.castText:SetText("")
         ctx.castText:Hide()
     end
+    if ctx then
+        -- The text was cleared above, so invalidate its cache as well.
+        -- Otherwise the same spell skips SetText and remains blank.
+        ctx.s2kLastCastName = nil
+    end
 end
 
 function UpdateCast(ctx)
@@ -641,6 +646,12 @@ function UpdateCast(ctx)
     if ApplyCastbarBorderVisual then ApplyCastbarBorderVisual(ctx) end
 
     if ctx.castText then
+        local textR, textG, textB, textA = GetCastbarSpellNameColor()
+        if ctx.s2kLastCastTextR ~= textR or ctx.s2kLastCastTextG ~= textG or ctx.s2kLastCastTextB ~= textB or ctx.s2kLastCastTextA ~= textA then
+            ctx.castText:SetTextColor(textR, textG, textB, textA)
+            ctx.s2kLastCastTextR, ctx.s2kLastCastTextG = textR, textG
+            ctx.s2kLastCastTextB, ctx.s2kLastCastTextA = textB, textA
+        end
         if CFG.showCastbarSpellName then
             if ctx.s2kLastCastName ~= name then
                 ctx.castText:SetText(name or "")
@@ -909,6 +920,10 @@ function ApplyVisibleTextFonts()
             end
             if ctx.name then
                 ApplyFontStringFont(ctx.name, CFG.nameFontKey, CFG.nameFontSize, CFG.nameFontOutlineKey, CFG.nameFontPath)
+            end
+            if ctx.castText then
+                ApplyFontStringFont(ctx.castText, CFG.castbarSpellNameFontKey, CFG.castbarSpellNameFontSize, CFG.castbarSpellNameFontOutlineKey, CFG.castbarSpellNameFontPath)
+                ctx.castText:SetTextColor(GetCastbarSpellNameColor())
             end
             if ctx.levelText then
                 ApplyFontStringFont(ctx.levelText, CFG.levelOverlayFontKey, CFG.levelOverlayFontSize, CFG.levelOverlayFontOutlineKey, CFG.levelOverlayFontPath)
