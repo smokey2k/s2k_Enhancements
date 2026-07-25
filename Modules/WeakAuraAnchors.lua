@@ -65,32 +65,6 @@ function RecordWeakAuraAnchorSample(mode, unit, startTime, ok, relinked)
     if relinked then stats.relinks = (stats.relinks or 0) + 1 end
 end
 
-function ResetWeakAuraAnchorEngine()
-    State.weakAuraLastTargetRegion = nil
-    State.weakAuraBarGroupsDirty = true
-
-    for _, ctx in pairs(State.plates or {}) do
-        if ctx then
-            if ctx.waHealthAnchor then
-                ctx.waHealthAnchor:ClearAllPoints()
-                ctx.waHealthAnchor:Hide()
-                ctx.waHealthAnchor.s2kBridgeSource = nil
-            end
-            if ctx.waCastAnchor then
-                ctx.waCastAnchor:ClearAllPoints()
-                ctx.waCastAnchor:Hide()
-                ctx.waCastAnchor.s2kBridgeSource = nil
-            end
-            ctx.s2kWAAnchorRegion = nil
-        end
-    end
-
-    if CFG and CFG.debugWeakAuraAnchorStatsEnabled == true then
-        ResetWeakAuraAnchorStats()
-    end
-    if MarkWeakAurasDirty then MarkWeakAurasDirty() end
-end
-
 function HideWAAnchors(ctx)
     if not ctx then return end
     if ctx.waHealthAnchor and (not ctx.waHealthAnchor.IsShown or ctx.waHealthAnchor:IsShown()) then

@@ -3,6 +3,11 @@
 -- =========================================================
 
 function SetFrameAlpha(frame, alpha)
+    local discovery = State and State.blizzardVisualDiscovery
+    if discovery and IsFrameObject(frame) and not discovery.seen[frame] then
+        discovery.seen[frame] = true
+        discovery.visuals[#discovery.visuals + 1] = frame
+    end
     if HasMethod(frame, "SetAlpha") then
         SafeCall(function() frame:SetAlpha(alpha) end)
     end
@@ -16,7 +21,7 @@ function HookBlizzardVisualFrame(frame)
     if HasMethod(frame, "HookScript") then
         State.blizzardVisualHooks[frame] = true
         frame:HookScript("OnShow", function(self)
-            if CFG and State.runtimeFlags and State.runtimeFlags.enabled and CFG.hideBlizzardVisuals then
+            if CFG and State.runtimeFlags and State.runtimeFlags.enabled then
                 SetFrameAlpha(self, 0)
             end
         end)
@@ -302,8 +307,53 @@ function HideBlizzardCastbarVisuals(uf, plate, blizzCastBar, alpha, skipFrame)
     HideGlobalCastbarVisualsForObjects(alpha, seen, skipFrame, blizzCastBar, uf, plate)
 end
 
+local function GetCachedBlizzardVisuals(plate, uf, blizzCastBar, skipFrame)
+    local caches = State.blizzardVisualCache
+    if not caches then
+        caches = setmetatable({}, { __mode = "k" })
+        State.blizzardVisualCache = caches
+    end
+
+    local cache = caches[plate]
+    if not cache
+    or cache.unitFrame ~= uf
+    or cache.castBar ~= blizzCastBar
+    or cache.skipFrame ~= skipFrame
+    then
+        cache = {
+            unitFrame = uf,
+            castBar = blizzCastBar,
+            skipFrame = skipFrame,
+            visuals = {},
+            seen = setmetatable({}, { __mode = "k" }),
+            fullDiscovered = false,
+        }
+        caches[plate] = cache
+    end
+
+    return cache
+end
+
+local function ApplyCachedBlizzardVisuals(cache, alpha)
+    for _, visual in ipairs(cache.visuals) do
+        SetFrameAlpha(visual, alpha)
+        HookBlizzardVisualFrame(visual)
+    end
+end
+
+local function BeginBlizzardVisualDiscovery(cache)
+    State.blizzardVisualDiscovery = cache
+end
+
+local function EndBlizzardVisualDiscovery(cache, full)
+    State.blizzardVisualDiscovery = nil
+    if full then
+        cache.fullDiscovered = true
+    end
+end
+
 function ApplyBlizzardCastbarVisualStateOnly(ctx)
-    if not (State.runtimeFlags and State.runtimeFlags.enabled) or not CFG.hideBlizzardVisuals or not ctx or not ctx.plate then
+    if not (State.runtimeFlags and State.runtimeFlags.enabled) or not ctx or not ctx.plate then
         return
     end
 
@@ -313,8 +363,15 @@ function ApplyBlizzardCastbarVisualStateOnly(ctx)
     end
 
     local blizzCastBar = GetCastBarFromUF(uf)
-    SetFrameAlpha(blizzCastBar, 0)
-    HideBlizzardCastbarVisuals(uf, ctx.plate, blizzCastBar, 0, ctx.root)
+    local cache = GetCachedBlizzardVisuals(ctx.plate, uf, blizzCastBar, ctx.root)
+    if cache.fullDiscovered then
+        ApplyCachedBlizzardVisuals(cache, 0)
+        return
+    end
+
+    -- Build the complete plate cache even when the cast path happens to be the
+    -- first caller. This keeps UnitFrame and plate discovery strictly one-shot.
+    ApplyBlizzardVisualState(ctx)
 end
 
 function ApplyBlizzardVisualState(ctx)
@@ -322,7 +379,16 @@ function ApplyBlizzardVisualState(ctx)
     local uf = GetUnitFrameFromPlate(ctx.plate)
     if not uf then return end
 
-    local alpha = (State.runtimeFlags and State.runtimeFlags.enabled and CFG.hideBlizzardVisuals) and 0 or 1
+    local alpha = (State.runtimeFlags and State.runtimeFlags.enabled) and 0 or 1
+
+    local blizzCastBar = GetCastBarFromUF(uf)
+    local cache = GetCachedBlizzardVisuals(ctx.plate, uf, blizzCastBar, ctx.root)
+    if cache.fullDiscovered then
+        ApplyCachedBlizzardVisuals(cache, alpha)
+        return
+    end
+
+    BeginBlizzardVisualDiscovery(cache)
 
     -- Stronger than hiding individual children: the Blizzard UnitFrame contains
     -- the default healthbar, target name, castbar, buff frame and several visual
@@ -330,8 +396,6 @@ function ApplyBlizzardVisualState(ctx)
     -- UnitFrame, so it stays visible while the Blizzard visuals disappear.
     SetFrameAlpha(uf, alpha)
     HookBlizzardVisualFrame(uf)
-
-    local blizzCastBar = GetCastBarFromUF(uf)
 
     SetFrameAlpha(GetHealthBarFromUF(uf), alpha)
     SetFrameAlpha(blizzCastBar, alpha)
@@ -360,4 +424,5 @@ function ApplyBlizzardVisualState(ctx)
     -- frame rather than UnitFrame fields. Hide Blizzard FontStrings on the plate
     -- too, but skip our own custom root so HP ratio/name remain visible.
     HideFontStringsInFrame(ctx.plate, alpha, 3, nil, ctx.root)
+    EndBlizzardVisualDiscovery(cache, true)
 end

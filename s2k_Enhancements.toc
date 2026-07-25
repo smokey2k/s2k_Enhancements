@@ -4,13 +4,22 @@
 ## Notes: s2k Enhancements - custom nameplates, quest enhancements, addon integrations and an LDB-accessible standalone configuration window for WoW 7.3.5.
 ## Notes-huHU: s2k Enhancements - egyéni névplate-ek, küldetéskiegészítések, addonintegrációk és LDB-ből elérhető önálló beállítási ablak WoW 7.3.5-höz.
 ## Author: s2k
-## Version: 1.19.0
+## Version: 1.30.0
 ## SavedVariables: s2k_EnhancementsDB, s2k_NameplatesDB
 ## OptionalDeps: WeakAuras, WeakAurasOptions, Dominos
 
 Libs/LibStub/LibStub.lua
 Libs/CallbackHandler-1.0/CallbackHandler-1.0.lua
 Libs/LibDataBroker-1.1/LibDataBroker-1.1.lua
+Libs/Ace3/AceGUI-3.0/AceGUI-3.0.xml
+Libs/Ace3/AceGUI-3.0/widgets/AceGUIWidget-S2KDropdown-Items.lua
+Libs/Ace3/AceGUI-3.0/widgets/AceGUIContainer-S2KFrame.lua
+Libs/Ace3/AceGUI-3.0/widgets/AceGUIWidget-S2KCheckBox.lua
+Libs/Ace3/AceGUI-3.0/widgets/AceGUIWidget-S2KColorPicker.lua
+Libs/Ace3/AceGUI-3.0/widgets/AceGUIWidget-S2KSlider.lua
+Libs/Ace3/AceGUI-3.0/widgets/AceGUIWidget-S2KDropdown.lua
+Libs/Ace3/AceConfig-3.0/AceConfigRegistry-3.0/AceConfigRegistry-3.0.lua
+Libs/Ace3/AceConfig-3.0/AceConfigDialog-3.0/AceConfigDialog-3.0.lua
 
 Core.lua
 Locales/Localization.lua
@@ -32,7 +41,7 @@ Modules/OptionsApply.lua
 Modules/QuestReputation.lua
 Modules/WeakAurasIntegration.lua
 Modules/DominosIntegration.lua
-Modules/OptionsUI.lua
+Modules/AceOptions.lua
 Modules/Broker.lua
 Modules/Runtime.lua
 Modules/Events.lua

@@ -11,3 +11,20 @@
 - Update `CHANGELOG.md` and the TOC version for every release.
 - In the addon window header, display only the numeric version; never show a build or release suffix beside it.
 - Keep sections within each configuration module visually distinct and easy to scan, using bordered groups, spacing, contrasting backgrounds, or an equivalent clear separation.
+- Keep the standalone addon window resizable in every direction; place ornate persistent collapse/expand and Close controls together at the top-right of the header, do not construct a bottom Close/status strip, and keep the header's screen position fixed while rolling content up or down.
+- Configuration text should use the available horizontal space and wrap when necessary; resizing the window must not stretch fixed-size controls.
+- Keep sliders fixed at 320 pixels wide and preserve uninterrupted left-button thumb dragging.
+- Keep statusbar-texture and border-texture dropdown headers and pullouts fixed at 180 pixels wide.
+- Size every other dropdown header from its selected text and its pullout from the widest item, with approximately two characters of horizontal margin on each side in addition to required AceGUI chrome.
+- In statusbar-texture dropdowns, fill each row with the texture and overlay its name on the preview.
+- In border-texture dropdowns, show plain names only; while an item is hovered, preview that texture as a clearly visible, color-aware border on the pullout, then restore the pullout's exact original backdrop and colors.
+- Treat AceGUI widgets as pooled objects: hide and reset all custom textures, borders, colors, hooks and other transient decoration state before a widget can be reused by an unrelated control.
+- Never allow media-preview textures or border decoration to leak or flash into ordinary dropdowns during refreshes, checkbox changes or color-picker interactions.
+- Restrict checkbox hover and click hit rectangles strictly to the checkbox square, and color-picker hit rectangles strictly to the color-swatch square; labels and unused row width must not be interactive.
+- Avoid rebuilding or visibly shifting the options panel for slider movement, ordinary dropdown selections, checkbox changes or color-picker changes; reserve full AceConfig notifications for actual option-tree, availability, list-content or multi-control state changes.
+- Each setting control must update only its own configuration key and intended runtime behavior; do not reapply unrelated settings such as camera distance from a generic options refresh.
+- Treat empty, single-item and multi-item dropdowns as required regression cases for every dropdown type. Empty dropdowns must not open a pullout, and pooled pullouts must reset item count, height, scroll offset, backdrop and preview state before reuse.
+- For every select option, verify that its `get` value has exactly the same Lua type and value as a key returned by `values` (especially numeric versus string keys); an existing selection must never render as blank because of a key-type mismatch.
+- Every named frame created by a custom pooled widget must use a namespace and counter shared across all variants that use the same Blizzard template; never reuse `$parent`-derived global frame names across text, texture, border or generic dropdown types.
+- Every configurable font setting must use the shared verified font application path and have complete targeted refresh coverage for all of its live, preview, profile-change and post-combat consumers.
+- Standalone auxiliary-window visibility controls must synchronize their bound config widget directly; do not call a full AceConfig `NotifyChange` merely to update that toggle.

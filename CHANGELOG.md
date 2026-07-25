@@ -1,3 +1,68 @@
+# s2k:Enhancements 1.30.0
+
+- Prevented the configuration content from jumping when opening or closing the nameplate preview by synchronizing its bound checkbox directly instead of rebuilding the AceConfig panel.
+- Audited all configurable font consumers: profile changes now hard-refresh every nameplate and preview text object, while chat frames and edit boxes use the shared verified font application path after explicit cache invalidation.
+- Hard-refresh castbar and preview FontStrings when changing fonts, and verify ambiguous 7.3.5 `SetFont` results against the effective font path so all registered fonts apply immediately instead of waiting for frame recycling.
+- Fixed intermittent font changes by synchronizing selected font paths before preview/runtime updates, treating rejected `SetFont` calls as failures, and including the nameplate preview in the final consolidated media refresh.
+
+- Removed remaining broad option-apply fallthroughs: camera, spell queue, chat, quest, debug, font and color controls now invoke only their intended consumers, and nameplate health updates no longer subscribe to both normal and frequent variants of the same event.
+- Removed renderer-era dead state and unused internal helpers, and fully cleared pooled dropdown preview texture paths on release so retained media references cannot reappear during reuse.
+- Avoided a second disabled-nameplate teardown from the master toggle and removed a duplicate preview redraw from targeted font updates.
+
+- Simplified the camera and Dominos compatibility paths after targeted WoW 7.3.5 testing: camera writes now use `SetCVar` with a verified `ConsoleExec` readback fallback, while Dominos show states use its verified `GetShowStates`/`SetShowStates` API.
+
+- Cached discovered Blizzard castbar, UnitFrame and nameplate visual objects per plate, so recurring cast and plate updates reapply alpha directly without repeatedly walking the visual trees.
+
+- Assigned every visible custom nameplate an isolated frame-level block ordered from its Blizzard plate, preventing text, aura, cast and marker overlays from a covered plate from bleeding through the plate in front.
+
+- Removed redundant full AceConfig rebuilds from ordinary dropdown selections, standalone toggles, Dominos action-bar rows and profile actions that already perform their own refresh; reload-popup cancellation now issues only one availability refresh, and addon-load notifications rebuild the panel only when media lists or relevant addon availability actually change.
+
+- Restored the local recursive frame-level helper required when S2K dropdown pullouts are acquired.
+
+- Isolated border-dropdown hover previews on a dedicated overlay instead of mutating the pooled pullout backdrop, and reset all pooled item hover callbacks on close, list replacement and release to prevent border decoration leaking into ordinary dropdowns.
+
+- Consolidated the separate font and statusbar-texture timer chains into one generation-guarded media refresh scheduler, deduplicating overlapping work and preserving targeted post-combat refreshes.
+
+- Moved the nameplate layout preview toggle into the shared Nameplates header, rebuilt the preview window on the S2K AceGUI frame container, and made media dropdown changes refresh the preview immediately while preserving combat-safe runtime deferral.
+- Made the preview window compact, positioned both complete nameplate previews from their measured visual bounds with a constant 10-pixel gap, and added a detailed top-left configuration summary with an eight-pixel margin.
+
+- Fixed global `UIDropDownMenuTemplate` frame-name collisions between text, texture and border S2K dropdown variants by giving every instance a shared counter and an S2K-only global namespace.
+
+- Removed new-file load-order dependencies from the configuration refactor and added pre-build validation so missing dropdown data or profile services cannot leave partially constructed AceGUI controls.
+
+- Restored seven shared dropdown option tables that were incorrectly removed with the legacy renderer, corrected numeric motion-mode keys, disabled the profile-source selector when no source exists, and made empty S2K dropdowns reset without opening malformed pullouts.
+
+- Fixed standalone dropdown width measurement using an unanchored font string and cleared relative layout state when applying fixed widths, preventing dropdown headers from stretching across and overlapping the options panel.
+
+- Removed the legacy OptionsUI renderer and moved its remaining profile, configuration-action and nameplate-preview services into the existing SavedSettings, OptionsApply and Frames modules; window-size resolution remains a private AceOptions helper.
+- Restored the embedded generic AceGUI Slider; cursor-tracking drag behavior now exists only in S2KSlider.
+- Replaced the wrapped generic-dropdown workaround with standalone S2K dropdown constructors and explicit acquire/release cleanup.
+
+- Enlarged the Close and roll controls to 32 pixels with an eight-pixel top/right window-edge gap, and moved both content and the right resize hitbox below the taller header controls.
+
+- Removed the separate ornate frames around the Close and roll controls, enlarged both header buttons to 28 pixels, and enlarged all resize hit areas and corner artwork to make resizing easier.
+
+- Moved the right-edge resize hitbox below the header so it cannot intercept Close clicks, and replaced the templated Close control with a precise 22x22 custom button sharing the ornate header chrome.
+
+- Raised the header Close/collapse controls and all resize handles onto a dedicated window-chrome frame level; resize artwork now uses the overlay draw layer so neither the window border nor option content can cover the controls.
+
+- AceConfigRegistry validation now accepts custom dialog controls for toggle, range and color options; the embedded Registry/Dialog minor versions were raised so older copies from addons such as Mapster or Fortress cannot replace this support.
+
+- Load the S2K widget layer directly after AceGUI and register each widget once through the standard AceGUI versioned registry; window creation now performs validation only and never mutates `WidgetVersions` or re-registers widgets.
+
+- Replaced label-based, delayed AceGUI control decoration with isolated S2K widget types selected directly by the AceConfig schema.
+- Added dedicated S2K checkbox and color-picker widgets whose mouse interaction is restricted to the visible square or swatch.
+- Added a dedicated fixed-width S2K slider with uninterrupted left-button cursor tracking and isolated setting callbacks.
+- Added separate text, statusbar-texture and border dropdown pools, preventing preview textures, colors and borders from leaking into unrelated dropdowns.
+- Kept sliders fixed at 320 pixels, media dropdowns fixed at 180 pixels, and sized ordinary dropdown headers and pullouts from their text with two-character side margins.
+- Statusbar dropdown rows and headers now show full-width textures with overlaid names; border dropdowns show plain names and preview the hovered, color-aware border on the pullout frame.
+- Extended the embedded legacy AceConfigDialog to honor custom `dialogControl` widget types for range and color controls.
+- Removed all delayed `FeedGroup` hooks, `C_Timer` decoration passes, label-based control discovery, hit-rectangle corrections and recycled-dropdown cleanup workarounds.
+- Added a dedicated S2KFrame container that never constructs a bottom Close/status strip, with ornate Close and collapse/expand controls in the fixed header.
+- Consolidated all Dominos action bars into one compact section with one row per bar: bar name, Anchored checkbox and labeled Frame strata dropdown.
+- Apply the maximum camera-distance setting only when its own control changes.
+- Kept the configuration independent from Blizzard Interface Options and preserved the existing `s2k_EnhancementsDB` profile format.
+- Added Blizzard nameplate OnHide cleanup for UIParent-parented custom roots, preventing stale nameplates when NAME_PLATE_UNIT_REMOVED is missed.
 # s2k:Enhancements 1.19.0
 
 - Fixed custom castbar spell names disappearing after an enemy's first cast.

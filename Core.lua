@@ -1,7 +1,7 @@
 -- =========================================================
 -- s2k:Enhancements (s2k Enhancements)
 -- WoW 7.3.5
--- v1.19.0
+-- v1.30.0
 -- Note: top-level helper functions are intentionally non-local to stay under the Lua 5.1 chunk-local limit.
 --
 -- Custom Blizzard-nameplate driven skin system.
@@ -22,7 +22,7 @@ _G.s2k_Enhancements = _G.s2k_Enhancements or {}
 API = _G.s2k_Enhancements
 -- Backward-compatible API alias for integrations written for the old addon name.
 _G.s2k_Nameplates = API
-API.version = "1.19.0"
+API.version = "1.30.0"
 
 
 DEFAULTS = {
@@ -320,6 +320,7 @@ DEFAULTS = {
     -- The first time a profile is created, these values are initialized from
     -- the player's current CVars when available.
     nameplateGlobalScale = 1.00,
+    largeNameplates = false,
     nameplateSelectedScale = 1.00,
     nameplateLargeBottomInset = 0.15,
     nameplateLargerScale = 1.20,
@@ -331,6 +332,14 @@ DEFAULTS = {
     nameplateOtherTopInset = 0.08,
     nameplateOverlapH = 0.80,
     nameplateOverlapV = 1.10,
+    nameplateShowSelf = true,
+    nameplateResourceOnTarget = false,
+    nameplateShowAll = false,
+    nameplateShowEnemies = true,
+    nameplateShowEnemyMinions = false,
+    nameplateShowEnemyMinus = true,
+    nameplateShowFriends = false,
+    nameplateShowFriendlyMinions = false,
 
     -- WeakAuras integration.
     -- The addon can directly place a named WeakAura region on the current target
@@ -381,17 +390,7 @@ State = {
     plates = {},
     activeCastUnits = {},
     runtimeFlags = {},
-    optionsBuilt = false,
-    optionsRefreshing = false,
-    optionsPanels = {},
-    openDropdownPopups = {},
-    dropdownCloseHooked = false,
     configFrame = nil,
-    configNav = nil,
-    configContentHost = nil,
-    configPanels = {},
-    configNavButtons = {},
-    configSelectedPanel = nil,
     nameplatePreviewFrame = nil,
     nameplatePreviewRequested = false,
     brokerInitialized = false,
@@ -414,14 +413,20 @@ State = {
     auraDirtyElapsed = 0,
     castRuntimeElapsed = 0,
     blizzardVisualHooks = setmetatable({}, { __mode = "k" }),
+    blizzardVisualCache = setmetatable({}, { __mode = "k" }),
     pendingCVarApply = false,
+    applyingNameplateCVars = false,
+    pendingNameplateCVarRuntimeRefresh = false,
     pendingOptionsApply = false,
+    pendingMediaRefreshFonts = false,
+    pendingMediaRefreshTextures = false,
     pendingDominosApply = false,
+    mediaRefreshGeneration = 0,
+    mediaRefreshFonts = false,
+    mediaRefreshTextures = false,
     dominosRuntimeEditSession = nil,
     dominosStatusText = nil,
     dominosStatusError = false,
-    dominosOptionsPage = nil,
-    interfaceOptionsPanel = nil,
     cachedTargetContext = nil,
     chatInitialized = false,
     chatCopyWindow = nil,
@@ -479,9 +484,48 @@ BUILTIN_STATUSBAR_TEXTURE_OPTIONS = {
     { key = "FLAT_WHITE",         label = "Flat / White8x8",    path = "Interface\\Buttons\\WHITE8X8" },
 }
 
-BORDER_STYLE_OPTIONS = {
-    { key = "NONE",  label = "None",       thickness = 0 },
-    { key = "THIN",  label = "Thin 1 px",  thickness = 1 },
-    { key = "THICK", label = "Thick 2 px", thickness = 2 },
-    { key = "HEAVY", label = "Heavy 3 px", thickness = 3 },
+-- S2K_SHARED_OPTION_VALUES
+SIDE_OPTIONS = {
+    { key = "TOP", label = "Top" },
+    { key = "BOTTOM", label = "Bottom" },
+    { key = "LEFT", label = "Left" },
+    { key = "RIGHT", label = "Right" },
+}
+
+ORIGIN_OPTIONS = {
+    { key = "LEFT", label = "Left edge" },
+    { key = "CENTER", label = "Center" },
+    { key = "RIGHT", label = "Right edge" },
+}
+
+GROWTH_OPTIONS = {
+    { key = "RIGHT", label = "Right" },
+    { key = "LEFT", label = "Left" },
+    { key = "UP", label = "Up" },
+    { key = "DOWN", label = "Down" },
+    { key = "CENTER_HORIZONTAL", label = "Center horizontal" },
+    { key = "CENTER_VERTICAL", label = "Center vertical" },
+}
+
+WRAP_DIRECTION_OPTIONS = {
+    { key = "UP", label = "New row upward" },
+    { key = "DOWN", label = "New row downward" },
+    { key = "LEFT", label = "New column left" },
+    { key = "RIGHT", label = "New column right" },
+}
+
+NAMEPLATE_MOTION_OPTIONS = {
+    { key = 0, label = "Overlapping / default" },
+    { key = 1, label = "Stacking" },
+    { key = 2, label = "Spread" },
+}
+
+BUFF_ANCHOR_OPTIONS = {
+    { key = "HEALTH", label = "Healthbar" },
+    { key = "DEBUFF", label = "Debuff frame" },
+}
+
+DEBUFF_ANCHOR_OPTIONS = {
+    { key = "HEALTH", label = "Healthbar" },
+    { key = "BUFF", label = "Buff frame" },
 }

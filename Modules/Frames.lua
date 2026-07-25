@@ -137,11 +137,12 @@ function SyncCustomFrameLevels(ctx)
         ctx.castText:SetDrawLayer("OVERLAY", 7)
     end
 
-    -- Healthbar border must be above the StatusBar texture, but below all
-    -- text/aura layers. If the border is above the ratio text it can draw a
-    -- black line through the HP ratio on 7.3.5/private-server clients.
+    -- Keep the border immediately above its own StatusBar. A large offset here
+    -- lets one UIParent-parented nameplate border interleave with the healthbar
+    -- of another nameplate, which looks like a translucent border bleeding
+    -- through stacked plates.
     if ctx.border and ctx.border.SetFrameLevel then
-        ctx.border:SetFrameLevel(base + 25)
+        ctx.border:SetFrameLevel(base + 3)
     end
 
     -- Text layers must be above both the StatusBar and the border.
@@ -195,6 +196,59 @@ function SyncCustomFrameStrata(ctx)
     end
 end
 
+local CUSTOM_NAMEPLATE_LEVEL_BASE = 100
+local CUSTOM_NAMEPLATE_LEVEL_STRIDE = 128
+local customNameplateCreationOrder = 0
+
+local function GetBlizzardNameplateOrder(ctx)
+    local plate = ctx and ctx.plate
+    local unitFrame = plate and GetUnitFrameFromPlate(plate)
+    local level = 0
+    if plate and plate.GetFrameLevel then
+        level = math.max(level, tonumber(plate:GetFrameLevel()) or 0)
+    end
+    if unitFrame and unitFrame.GetFrameLevel then
+        level = math.max(level, tonumber(unitFrame:GetFrameLevel()) or 0)
+    end
+    return level
+end
+
+function SyncCustomNameplateFrameOrder()
+    local groups = {}
+    for _, ctx in pairs((State and State.plates) or {}) do
+        if ctx and ctx.root and ctx.root:IsShown() and ctx.plate and FrameIsVisible(ctx.plate) then
+            local strata = GetNameplateFrameStrata(ctx)
+            groups[strata] = groups[strata] or {}
+            groups[strata][#groups[strata] + 1] = ctx
+        end
+    end
+
+    for _, contexts in pairs(groups) do
+        table.sort(contexts, function(a, b)
+            local aLevel = GetBlizzardNameplateOrder(a)
+            local bLevel = GetBlizzardNameplateOrder(b)
+            if aLevel ~= bLevel then return aLevel < bLevel end
+
+            local aTarget = IsTargetUnit(a.unit) and 1 or 0
+            local bTarget = IsTargetUnit(b.unit) and 1 or 0
+            if aTarget ~= bTarget then return aTarget < bTarget end
+
+            return (a.s2kCreationOrder or 0) < (b.s2kCreationOrder or 0)
+        end)
+
+        for index, ctx in ipairs(contexts) do
+            local base = CUSTOM_NAMEPLATE_LEVEL_BASE + ((index - 1) * CUSTOM_NAMEPLATE_LEVEL_STRIDE)
+            if ctx.root.SetFrameLevel then ctx.root:SetFrameLevel(base) end
+            if ctx.waHealthAnchor and ctx.waHealthAnchor.SetFrameLevel then
+                ctx.waHealthAnchor:SetFrameLevel(base + 110)
+            end
+            if ctx.waCastAnchor and ctx.waCastAnchor.SetFrameLevel then
+                ctx.waCastAnchor:SetFrameLevel(base + 111)
+            end
+            SyncCustomFrameLevels(ctx)
+        end
+    end
+end
 function CreateAuraButton(parent)
     local btn = CreateFrame("Frame", nil, parent)
 
@@ -231,11 +285,37 @@ function EnsureAuraButtons(frame, maxIcons)
     end
 end
 
+function CleanupHiddenNameplateContext(plate)
+    local ctx = plate and plate.s2kNameplateContext
+    if not ctx then return end
+
+    local unit = ctx.unit
+    if unit then
+        if State.plates and State.plates[unit] == ctx then
+            State.plates[unit] = nil
+        end
+        if State.activeCastUnits and State.activeCastUnits[unit] == ctx then
+            State.activeCastUnits[unit] = nil
+        end
+        if State.auraDirtyUnits then
+            State.auraDirtyUnits[unit] = nil
+        end
+    end
+
+    ResetNameplateContextVisuals(ctx, true)
+    ctx.unit = nil
+
+    if ClearTargetContextCache then ClearTargetContextCache() end
+    if MarkWeakAurasDirty then MarkWeakAurasDirty() end
+end
+
 function CreateNameplateContext(unit, plate)
     local ctx = {
         unit = unit,
         plate = plate,
     }
+    customNameplateCreationOrder = customNameplateCreationOrder + 1
+    ctx.s2kCreationOrder = customNameplateCreationOrder
 
     local plateName = plate and plate.GetName and plate:GetName()
     local rootName = plateName and (plateName .. "S2KRoot") or nil
@@ -247,7 +327,7 @@ function CreateNameplateContext(unit, plate)
     -- to the recycled Blizzard healthbar/nameplate.
     local root = CreateFrame("Frame", rootName, UIParent)
     root:SetFrameStrata(GetNameplateFrameStrata(ctx))
-    root:SetFrameLevel((plate.GetFrameLevel and plate:GetFrameLevel() or 0) + 100)
+    root:SetFrameLevel(CUSTOM_NAMEPLATE_LEVEL_BASE)
     root:Hide()
     ctx.root = root
     root.s2kNameplateContext = ctx
@@ -402,6 +482,17 @@ function CreateNameplateContext(unit, plate)
     plate.s2kCustomHealthBar = health
     plate.s2kCustomCastBar = cast
     State.plates[unit] = ctx
+
+    -- The custom visual root is parented to UIParent so it can use an
+    -- independent frame strata. It therefore does not inherit the Blizzard
+    -- nameplate's hidden state. Clean it up directly when the recycled
+    -- Blizzard plate hides, even if NAME_PLATE_UNIT_REMOVED is missed.
+    if plate.HookScript and not plate.s2kHideCleanupHooked then
+        plate.s2kHideCleanupHooked = true
+        plate:HookScript("OnHide", function(self)
+            CleanupHiddenNameplateContext(self)
+        end)
+    end
     return ctx
 end
 
@@ -538,3 +629,259 @@ function GetTargetContextCached()
     State.cachedTargetContext = ctx
     return ctx
 end
+
+-- S2K_NAMEPLATE_PREVIEW
+local PREVIEW_ICONS = {
+    "Interface\\Icons\\Spell_Holy_PowerWordShield", "Interface\\Icons\\Spell_Nature_LightningShield",
+    "Interface\\Icons\\Spell_Shadow_ShadowWordPain", "Interface\\Icons\\Spell_Fire_Fireball02",
+}
+
+local function PreviewTexture(isTarget, backdrop)
+    if isTarget and CFG.targetHealthbarOverride then
+        local key = backdrop and CFG.targetHealthBackdropTextureKey or CFG.targetHealthTextureKey
+        local path = backdrop and CFG.targetHealthBackdropTexturePath or CFG.targetHealthTexturePath
+        local option = GetStatusBarTextureOption(key, path)
+        return (option and option.path) or path or (backdrop and GetHealthBackdropTexturePath() or GetHealthTexturePath())
+    end
+    return backdrop and GetHealthBackdropTexturePath() or GetHealthTexturePath()
+end
+
+local function PreviewHealthColor(isTarget)
+    if isTarget and CFG.targetHealthbarOverride and not CFG.targetHealthUseReactionColor then return GetCustomColor("targetHealthColor", .85, .1, .1, 1) end
+    if not isTarget and not CFG.healthUseReactionColor then return GetCustomColor("healthColor", .85, .1, .1, 1) end
+    return .85, .1, .1, 1
+end
+
+local function NewPreviewAura(parent, icon)
+    local button = CreateAuraButton(parent)
+    button.icon:SetTexture(icon)
+    return button
+end
+
+local function NewPreviewPlate(parent, isTarget)
+    local p = {isTarget=isTarget}
+    p.hitbox = CreateFrame("Frame", nil, parent)
+    p.hitbox.bg = p.hitbox:CreateTexture(nil,"BACKGROUND"); p.hitbox.bg:SetAllPoints(); p.hitbox.bg:SetColorTexture(1,.82,.05,.13)
+    p.hitboxBorder = CreateBorder(p.hitbox)
+    p.hitboxLabel = p.hitbox:CreateFontString(nil,"OVERLAY","GameFontNormalSmall"); p.hitboxLabel:SetPoint("TOPLEFT",4,-3); p.hitboxLabel:SetTextColor(1,.85,.15)
+    p.root = CreateFrame("Frame",nil,p.hitbox); p.root:SetFrameLevel(100)
+    p.border = CreateBorder(p.root)
+    p.background = p.root:CreateTexture(nil,"BACKGROUND"); p.background:SetAllPoints()
+    p.health = CreateFrame("StatusBar",nil,p.root); p.health:SetAllPoints(); p.health:SetMinMaxValues(0,1); p.health:SetValue(isTarget and .64 or .82)
+    p.playerCastOverlay = CreateFrame("StatusBar",nil,p.root); p.playerCastOverlay:SetAllPoints(); p.playerCastOverlay:SetMinMaxValues(0,1); p.playerCastOverlay:SetValue(.56)
+    p.playerCastOverlaySpark = CreateFrame("Frame",nil,p.root); p.playerCastOverlaySpark.texture=p.playerCastOverlaySpark:CreateTexture(nil,"OVERLAY"); p.playerCastOverlaySpark.texture:SetAllPoints()
+    p.hpMarker=CreateFrame("Frame",nil,p.root); p.hpMarker.texture=p.hpMarker:CreateTexture(nil,"ARTWORK"); p.hpMarker.texture:SetAllPoints()
+    p.levelLayer=CreateFrame("Frame",nil,p.root); p.levelLayer:SetAllPoints(); p.levelText=p.levelLayer:CreateFontString(nil,"OVERLAY","GameFontNormalSmall"); p.levelText:SetText(isTarget and "110+" or "110")
+    p.nameLayer=CreateFrame("Frame",nil,p.root); p.nameLayer:SetAllPoints(); p.name=p.nameLayer:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
+    p.ratioLayer=CreateFrame("Frame",nil,p.root); p.ratioLayer:SetAllPoints(); p.ratio=p.ratioLayer:CreateFontString(nil,"OVERLAY","GameFontNormalSmall"); p.ratio:SetText(isTarget and "291.2" or "84.6")
+    p.cast=CreateFrame("StatusBar",nil,p.root); p.cast:SetMinMaxValues(0,1); p.cast:SetValue(isTarget and .68 or .42); p.cast.bg=p.cast:CreateTexture(nil,"BACKGROUND"); p.cast.bg:SetAllPoints()
+    p.castBorder=CreateBorder(p.cast); p.castText=p.cast:CreateFontString(nil,"OVERLAY","GameFontNormalSmall"); p.castText:SetText(S2K_L("Spell cast"))
+    p.castIconFrame=CreateFrame("Frame",nil,p.root); p.castIconFrame.icon=p.castIconFrame:CreateTexture(nil,"ARTWORK"); p.castIconFrame.icon:SetAllPoints(); p.castIconFrame.icon:SetTexture(PREVIEW_ICONS[4]); p.castIconFrame.icon:SetTexCoord(.08,.92,.08,.92); p.castIconFrame.border=CreateBorder(p.castIconFrame)
+    p.buffFrame=CreateFrame("Frame",nil,p.root); p.buffFrame.buttons={}; p.debuffFrame=CreateFrame("Frame",nil,p.root); p.debuffFrame.buttons={}
+    for i=1,4 do p.buffFrame.buttons[i]=NewPreviewAura(p.buffFrame,PREVIEW_ICONS[i]); p.debuffFrame.buttons[i]=NewPreviewAura(p.debuffFrame,PREVIEW_ICONS[5-i]) end
+    return p
+end
+
+function RecreateNameplatePreviewTextObjects(settingKey)
+    local frame = State.nameplatePreviewFrame
+    if not frame then return end
+
+    local function Replace(plate, field, parent, fallbackText)
+        local previous = plate[field]
+        local value = previous and previous:GetText() or fallbackText or ""
+        if previous then
+            previous:SetText("")
+            previous:Hide()
+        end
+        local replacement = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        replacement:SetText(value)
+        plate[field] = replacement
+    end
+
+    for _, plate in ipairs({ frame.generalPreview, frame.targetPreview }) do
+        if plate then
+            if not settingKey or settingKey == "hpRatioFontKey" then Replace(plate, "ratio", plate.ratioLayer, plate.isTarget and "291.2" or "84.6") end
+            if not settingKey or settingKey == "nameFontKey" then Replace(plate, "name", plate.nameLayer, plate.isTarget and S2K_L("Target nameplate") or S2K_L("General nameplate")) end
+            if not settingKey or settingKey == "levelOverlayFontKey" then Replace(plate, "levelText", plate.levelLayer, plate.isTarget and "110+" or "110") end
+            if not settingKey or settingKey == "castbarSpellNameFontKey" then Replace(plate, "castText", plate.cast, S2K_L("Spell cast")) end
+        end
+    end
+end
+local function PreviewMarker(p,w)
+    if not CFG.hpMarkerEnabled or (CFG.hpMarkerOnlyTarget and not p.isTarget) then p.hpMarker:Hide(); return end
+    local pct=math.max(0,math.min(100,tonumber(CFG.hpMarkerPercent) or 35)); local pos=w*pct/100; local mode=tostring(CFG.hpMarkerWidthMode or "LINE")
+    p.hpMarker:ClearAllPoints()
+    if mode=="LEFT_TO_ZERO" then p.hpMarker:SetPoint("TOPLEFT",p.health,"TOPLEFT"); p.hpMarker:SetPoint("BOTTOMLEFT",p.health,"BOTTOMLEFT"); p.hpMarker:SetWidth(math.max(1,pos))
+    elseif mode=="RIGHT_TO_END" then p.hpMarker:SetPoint("TOPLEFT",p.health,"TOPLEFT",pos,0); p.hpMarker:SetPoint("BOTTOMLEFT",p.health,"BOTTOMLEFT",pos,0); p.hpMarker:SetWidth(math.max(1,w-pos))
+    else p.hpMarker:SetPoint("TOP",p.health,"TOP",pos-w/2,0); p.hpMarker:SetPoint("BOTTOM",p.health,"BOTTOM",pos-w/2,0); p.hpMarker:SetWidth(math.max(1,tonumber(CFG.hpMarkerWidth) or 2)) end
+    local r,g,b,a=GetHPMarkerColor(); if CFG.hpMarkerUseBorderColor then if p.isTarget and CFG.targetHealthbarOverride then r,g,b=GetTargetBorderColor() else r,g,b=GetAllBorderColor() end end
+    p.hpMarker.texture:SetColorTexture(r,g,b,a); p.hpMarker:Show()
+end
+
+local function UpdatePreviewPlate(p,y,scale)
+    local hw=math.max(1,tonumber(CFG.nameplateHitboxWidth) or 110); local hh=math.max(1,tonumber(CFG.nameplateHitboxHeight) or 45); local w=math.max(1,tonumber(CFG.plateWidth) or 110); local h=math.max(1,tonumber(CFG.plateHeight) or 12)
+    p.hitbox:SetScale(scale); p.hitbox:ClearAllPoints(); p.hitbox:SetPoint("CENTER",p.hitbox:GetParent(),"CENTER",0,y/scale); p.hitbox:SetSize(hw,hh)
+    ApplyBorderVisual(p.hitboxBorder,"S2K_SOLID","Interface\\Buttons\\WHITE8X8",1,0,0,1,.82,.05,.9)
+    p.hitboxLabel:SetText(p.isTarget and S2K_L("Target nameplate") or S2K_L("General nameplate"))
+    p.root:ClearAllPoints(); p.root:SetPoint("CENTER",p.hitbox,"CENTER",tonumber(CFG.healthbarHitboxXOffset) or 0,tonumber(CFG.healthbarHitboxYOffset) or 0); p.root:SetSize(w,h)
+    ApplyStatusBarTexture(p.health,PreviewTexture(p.isTarget,false)); p.health:SetStatusBarColor(PreviewHealthColor(p.isTarget))
+    local br,bg,bb,ba; local target=p.isTarget and CFG.targetHealthbarOverride
+    if target then br,bg,bb,ba=GetCustomColor("targetHealthBackdropColor",0,0,0,.65) else br,bg,bb,ba=GetCustomColor("healthBackdropColor",0,0,0,CFG.healthBackgroundAlpha or .65) end
+    ApplyStatusBarBackdropTexture(p.background,PreviewTexture(p.isTarget,true),br,bg,bb,ba)
+    local tk=target and "targetBorderTextureKey" or "borderTextureKey"; local tp=target and "targetBorderTexturePath" or "borderTexturePath"; local sz=target and CFG.targetBorderSize or CFG.borderSize; local ins=target and CFG.targetBorderInset or CFG.borderInset; local off=target and CFG.targetBorderOffset or CFG.borderOffset
+    if target then br,bg,bb,ba=GetTargetBorderColor() else br,bg,bb,ba=GetAllBorderColor() end
+    ApplyBorderVisual(p.border,CFG[tk],GetConfiguredBorderTexturePath(tk,tp),sz,ins,off,br,bg,bb,ba)
+    ApplyStatusBarTexture(p.playerCastOverlay,GetHealthTexturePath()); p.playerCastOverlay:SetStatusBarColor(GetPlayerCastOverlayColor()); if p.isTarget and CFG.playerCastOverlayEnabled then p.playerCastOverlay:Show() else p.playerCastOverlay:Hide() end
+    p.playerCastOverlaySpark:ClearAllPoints(); p.playerCastOverlaySpark:SetPoint("CENTER",p.root,"LEFT",w*.56,0); p.playerCastOverlaySpark:SetSize(tonumber(CFG.playerCastOverlaySparkWidth) or 2,h); ApplyTexturePath(p.playerCastOverlaySpark.texture,GetPlayerCastOverlaySparkTexturePath()); p.playerCastOverlaySpark.texture:SetVertexColor(GetPlayerCastOverlaySparkColor()); if p.isTarget and CFG.playerCastOverlayEnabled and CFG.playerCastOverlaySparkEnabled then p.playerCastOverlaySpark:Show() else p.playerCastOverlaySpark:Hide() end
+    PreviewMarker(p,w)
+    p.ratio:ClearAllPoints(); p.ratio:SetPoint("CENTER",p.ratioLayer,"CENTER",0,tonumber(CFG.hpRatioYOffset) or 0); ApplyFontStringFont(p.ratio,CFG.hpRatioFontKey,CFG.hpRatioFontSize,CFG.hpRatioFontOutlineKey,CFG.hpRatioFontPath); p.ratio:SetTextColor(GetHPRatioColor()); if CFG.hpRatioText then p.ratio:Show() else p.ratio:Hide() end
+    p.name:SetText(p.isTarget and S2K_L("Target nameplate") or S2K_L("General nameplate")); p.name:ClearAllPoints(); p.name:SetPoint("BOTTOM",p.root,"TOP",0,tonumber(CFG.nameYOffset) or 4); ApplyFontStringFont(p.name,CFG.nameFontKey,CFG.nameFontSize,CFG.nameFontOutlineKey,CFG.nameFontPath); if CFG.showNames then p.name:Show() else p.name:Hide() end
+    ApplyFontStringFont(p.levelText,CFG.levelOverlayFontKey,CFG.levelOverlayFontSize,CFG.levelOverlayFontOutlineKey,CFG.levelOverlayFontPath); p.levelText:SetTextColor(GetLevelOverlayColor()); ApplyLevelOverlayAnchor(p.levelText,p.levelLayer,CFG.levelOverlayXOffset or 0,CFG.levelOverlayYOffset or 16); if CFG.levelOverlayEnabled then p.levelText:Show() else p.levelText:Hide() end
+    ApplyFontStringFont(p.castText,CFG.castbarSpellNameFontKey,CFG.castbarSpellNameFontSize,CFG.castbarSpellNameFontOutlineKey,CFG.castbarSpellNameFontPath); p.castText:SetTextColor(GetCastbarSpellNameColor()); ApplyStatusBarTexture(p.cast,GetCastbarTexturePath()); ApplyStatusBarBackdropTexture(p.cast.bg,GetCastbarBackdropTexturePath(),GetCastbarBackdropColor()); p.cast:SetStatusBarColor(GetCastbarColor()); PositionCastbar(p); if CFG.showCastbar then p.cast:Show() else p.cast:Hide() end; if CFG.showCastbar and CFG.showCastbarSpellName then p.castText:Show() else p.castText:Hide() end; if CFG.showCastbar and CFG.showCastbarIcon then p.castIconFrame:Show() else p.castIconFrame:Hide() end
+    PositionAuraFrame(p,"DEBUFF",4); PositionAuraButtons(p.debuffFrame,"DEBUFF",4); PositionAuraFrame(p,"BUFF",4); PositionAuraButtons(p.buffFrame,"BUFF",4); if CFG.debuffFrameEnabled then p.debuffFrame:Show() else p.debuffFrame:Hide() end; if CFG.buffFrameEnabled then p.buffFrame:Show() else p.buffFrame:Hide() end; for i=1,4 do p.debuffFrame.buttons[i]:Show(); p.buffFrame.buttons[i]:Show() end
+    SyncCustomFrameLevels(p)
+end
+
+local function GetPreviewPlateBounds(p)
+    local top, bottom
+    local objects = {
+        p.hitbox, p.hitboxBorder, p.root, p.border, p.cast, p.castBorder,
+        p.castIconFrame, p.castIconFrame and p.castIconFrame.border,
+        p.buffFrame, p.debuffFrame, p.name, p.levelText,
+    }
+    for _, object in ipairs(objects) do
+        if object and object.IsShown and object:IsShown() and object.GetTop and object.GetBottom then
+            local objectTop, objectBottom = object:GetTop(), object:GetBottom()
+            if objectTop and objectBottom then
+                top = top and math.max(top, objectTop) or objectTop
+                bottom = bottom and math.min(bottom, objectBottom) or objectBottom
+            end
+        end
+    end
+    return top, bottom
+end
+
+local function PositionPreviewPlates(f, scale)
+    local general, target = f.generalPreview, f.targetPreview
+    UpdatePreviewPlate(general, 0, scale)
+    UpdatePreviewPlate(target, 0, scale)
+
+    local generalTop, generalBottom = GetPreviewPlateBounds(general)
+    local targetTop, targetBottom = GetPreviewPlateBounds(target)
+    local _, canvasCenter = f.canvas:GetCenter()
+    if not generalTop or not generalBottom or not targetTop or not targetBottom or not canvasCenter then
+        UpdatePreviewPlate(general, 55, scale)
+        UpdatePreviewPlate(target, -55, scale)
+        return
+    end
+
+    local gap = 10
+    local generalHeight = generalTop - generalBottom
+    local targetHeight = targetTop - targetBottom
+    local totalHeight = generalHeight + gap + targetHeight
+    local desiredBottom = canvasCenter - totalHeight / 2
+    local targetOffset = desiredBottom - targetBottom
+    local generalOffset = desiredBottom + targetHeight + gap - generalBottom
+    UpdatePreviewPlate(general, generalOffset, scale)
+    UpdatePreviewPlate(target, targetOffset, scale)
+end
+
+local function PreviewValue(value)
+    local number = tonumber(value) or 0
+    if number == math.floor(number) then return tostring(number) end
+    return string.format("%.2f", number):gsub("0+$", ""):gsub("%.$", "")
+end
+local function AnimatePreviewPlayerCast(frame, elapsed)
+    local p = frame and frame.targetPreview
+    if not p or not CFG.playerCastOverlayEnabled then return end
+
+    p.previewCastProgress = ((p.previewCastProgress or 0) + (tonumber(elapsed) or 0) / 2.5) % 1
+    p.playerCastOverlay:SetValue(p.previewCastProgress)
+    p.playerCastOverlay:Show()
+
+    local width = math.max(1, tonumber(CFG.plateWidth) or 110)
+    p.playerCastOverlaySpark:ClearAllPoints()
+    p.playerCastOverlaySpark:SetPoint("CENTER", p.root, "LEFT", width * p.previewCastProgress, 0)
+end
+function EnsureNameplatePreview()
+    if State.nameplatePreviewFrame then return State.nameplatePreviewFrame end
+    local gui=LibStub and LibStub("AceGUI-3.0",true)
+    if not gui then return nil end
+    local widget=gui:Create("S2KFrame")
+    if not widget then return nil end
+    widget:SetTitle(S2K_L("Nameplate layout preview"))
+    widget:SetWidth(560)
+    widget:SetHeight(380)
+    widget:EnableResize(true)
+    widget.frame:ClearAllPoints()
+    widget.frame:SetPoint("CENTER",UIParent,"CENTER",0,40)
+    widget.frame:SetClampedToScreen(true)
+
+    local f=widget.frame
+    local content=widget.content
+    local close=CreateFrame("Button",nil,f)
+    close:SetSize(32,32)
+    close:SetPoint("TOPRIGHT",f,"TOPRIGHT",-8,-8)
+    close:SetFrameLevel(f:GetFrameLevel()+60)
+    close:RegisterForClicks("LeftButtonUp")
+    close:SetNormalTexture("Interface\\Buttons\\UI-Panel-MinimizeButton-Up")
+    close:SetPushedTexture("Interface\\Buttons\\UI-Panel-MinimizeButton-Down")
+    close:SetHighlightTexture("Interface\\Buttons\\UI-Panel-MinimizeButton-Highlight")
+    close:SetHitRectInsets(0,0,0,0)
+    close:SetScript("OnClick",function()
+        State.nameplatePreviewRequested=false
+        widget:Hide()
+        if SyncNameplatePreviewToggleControl then SyncNameplatePreviewToggleControl(false) end
+    end)
+
+    f.info=content:CreateFontString(nil,"OVERLAY","GameFontHighlightSmall")
+    f.info:SetPoint("TOPLEFT",content,"TOPLEFT",8,-8)
+    f.info:SetPoint("TOPRIGHT",content,"TOPRIGHT",-8,-8)
+    f.info:SetJustifyH("LEFT")
+    f.info:SetJustifyV("TOP")
+    f.canvas=CreateFrame("Frame",nil,content)
+    f.canvas:SetPoint("TOPLEFT",content,"TOPLEFT",8,-70)
+    f.canvas:SetPoint("BOTTOMRIGHT",content,"BOTTOMRIGHT",-8,8)
+    f.generalPreview=NewPreviewPlate(f.canvas,false)
+    f.targetPreview=NewPreviewPlate(f.canvas,true)
+    f:SetScript("OnUpdate",AnimatePreviewPlayerCast)
+    f:SetScript("OnSizeChanged",function() if UpdateNameplatePreview then UpdateNameplatePreview() end end)
+    f:Hide()
+    f.s2kPreviewWidget=widget
+    f.s2kPreviewCloseWidget=close
+    State.nameplatePreviewWidget=widget
+    State.nameplatePreviewFrame=f
+    return f
+end
+
+function UpdateNameplatePreview()
+    local f=State.nameplatePreviewFrame
+    if not f or not f:IsShown() then return end
+
+    local hw=math.max(1,tonumber(CFG.nameplateHitboxWidth) or 110)
+    local hh=math.max(1,tonumber(CFG.nameplateHitboxHeight) or 45)
+    local healthWidth=math.max(1,tonumber(CFG.plateWidth) or 110)
+    local healthHeight=math.max(1,tonumber(CFG.plateHeight) or 12)
+    local availableWidth=math.max(1,(f.canvas:GetWidth() or 500)-20)
+    local scale=math.min(1,availableWidth/math.max(hw,healthWidth))
+
+    f.info:SetText(string.format(
+        "%s: %s x %s    %s: %s x %s    %s: %s, %s    %s: %s / %s\n" ..
+        "%s: %s / %s / %s    %s: %s    %s: %s    %s: %s\n" ..
+        "%s: %s x %s, %s %s    %s: %s x %s, %s %s",
+        S2K_L("Hitbox"),PreviewValue(hw),PreviewValue(hh),
+        S2K_L("Healthbar"),PreviewValue(healthWidth),PreviewValue(healthHeight),
+        S2K_L("Health offset"),PreviewValue(CFG.healthbarHitboxXOffset),PreviewValue(CFG.healthbarHitboxYOffset),
+        S2K_L("Global / selected scale"),PreviewValue(CFG.nameplateGlobalScale),PreviewValue(CFG.nameplateSelectedScale),
+        S2K_L("Border size / inset / offset"),PreviewValue(CFG.borderSize),PreviewValue(CFG.borderInset),PreviewValue(CFG.borderOffset),
+        S2K_L("Castbar height"),PreviewValue(CFG.castbarHeight),S2K_L("Castbar Y offset"),PreviewValue(CFG.castbarYOffset),
+        S2K_L("Icon size"),PreviewValue(CFG.castbarIconSize),
+        S2K_L("Buff icons"),PreviewValue(CFG.buffIconWidth),PreviewValue(CFG.buffIconHeight),S2K_L("spacing"),PreviewValue(CFG.buffIconSpacing),
+        S2K_L("Debuff icons"),PreviewValue(CFG.debuffIconWidth),PreviewValue(CFG.debuffIconHeight),S2K_L("spacing"),PreviewValue(CFG.debuffIconSpacing)
+    ))
+    PositionPreviewPlates(f,scale)
+end
+
+function SetNameplatePreviewShown(shown) State.nameplatePreviewRequested=shown and true or false; local f=EnsureNameplatePreview(); if not f then return end; if State.nameplatePreviewRequested and State.configFrame and State.configFrame:IsShown() then f:Show(); UpdateNameplatePreview() else f:Hide() end end
+function RefreshNameplatePreviewVisibility() local show=State.nameplatePreviewRequested and State.configFrame and State.configFrame:IsShown(); if show then local f=EnsureNameplatePreview(); if not f then return end; f:Show(); UpdateNameplatePreview() elseif State.nameplatePreviewFrame then State.nameplatePreviewFrame:Hide() end end
+function HideNameplatePreview() if State.nameplatePreviewFrame then State.nameplatePreviewFrame:Hide() end end

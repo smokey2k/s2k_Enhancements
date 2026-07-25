@@ -144,11 +144,7 @@ function GetDominosCompatibilityStatus()
         return false, "Dominos is loaded, but its action-bar frames are not ready; this integration is disabled until Dominos finishes loading."
     end
 
-    local supportsStates = frame.SetShowStates
-        or frame.SetUserDisplayConditions
-        or (frame.sets and frame.UpdateShowStates)
-
-    if not supportsStates then
+    if not frame.GetShowStates or not frame.SetShowStates then
         return false, "Dominos was detected, but this version does not expose a compatible show-state API."
     end
 
@@ -281,15 +277,6 @@ function GetDominosFrameShowStates(frame)
         if ok then return tostring(value or "") end
     end
 
-    if frame.GetUserDisplayConditions then
-        local ok, value = pcall(frame.GetUserDisplayConditions, frame)
-        if ok then return tostring(value or "") end
-    end
-
-    if frame.sets then
-        return tostring(frame.sets.showstates or "")
-    end
-
     return ""
 end
 
@@ -304,27 +291,12 @@ function SetDominosFrameShowStates(frame, states)
 
     if frame.SetShowStates then
         ok, err = pcall(frame.SetShowStates, frame, states)
-    elseif frame.SetUserDisplayConditions then
-        ok, err = pcall(frame.SetUserDisplayConditions, frame, states)
-    elseif frame.sets and frame.UpdateShowStates then
-        frame.sets.showstates = states
-        ok, err = pcall(frame.UpdateShowStates, frame)
     else
         return false, "This Dominos frame has no compatible show-state API."
     end
 
     if not ok then
-        if frame.sets then
-            frame.sets.showstates = previous ~= "" and previous or nil
-        end
-
-        if frame.SetShowStates then
-            pcall(frame.SetShowStates, frame, previous)
-        elseif frame.SetUserDisplayConditions then
-            pcall(frame.SetUserDisplayConditions, frame, previous)
-        elseif frame.UpdateShowStates then
-            pcall(frame.UpdateShowStates, frame)
-        end
+        pcall(frame.SetShowStates, frame, previous)
 
         return false, tostring(err or "Unknown Dominos show-state error.")
     end
@@ -496,8 +468,6 @@ function ToggleDominosLayoutMode(source, silent)
     elseif ApplyDominosIntegration then
         ApplyDominosIntegration(false)
     end
-
-    RefreshDominosOptionsControls()
 
     if not silent then
         local suffix = (State and State.pendingDominosApply) and " (waiting for combat to end)" or ""
@@ -908,19 +878,8 @@ function ApplyDominosEditableMode()
 end
 
 function RefreshDominosOptionsControls()
-    if State and State.dominosOptionsPage and State.dominosOptionsPage.IsShown and State.dominosOptionsPage:IsShown() then
-        local old = State.optionsRefreshing
-        State.optionsRefreshing = true
-        for _, control in ipairs(State.dominosOptionsPage.s2kRefreshables or {}) do
-            if control and control.Refresh then
-                control:Refresh()
-            end
-        end
-        State.optionsRefreshing = old
-    end
-
-    if RefreshAddonsOptionsAvailability then
-        RefreshAddonsOptionsAvailability()
+    if SyncDominosOptionsControls then
+        SyncDominosOptionsControls()
     end
 end
 

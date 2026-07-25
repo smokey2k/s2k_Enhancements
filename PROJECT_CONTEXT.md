@@ -1,8 +1,8 @@
-# s2k:Enhancements – Project Context
+# s2k:Enhancements - Project Context
 
 ## Current state
 
-Current stable version: 1.19.0
+Current stable version: 1.30.0
 Target client: World of Warcraft 7.3.5
 Interface version: 70300
 
@@ -17,7 +17,9 @@ s2k:Enhancements contains custom nameplates, configurable hitboxes and strata, a
 - SavedVariables are s2k_EnhancementsDB with legacy s2k_NameplatesDB migration support.
 - Existing profiles and configuration keys must remain backward compatible.
 - Embedded libraries are stored under Libs.
-- AceConfig, AceGUI and AceDB are not currently used.
+- The standalone UI uses embedded AceGUI-3.0 and AceConfig-3.0 pinned to the WoW 7.3.5-compatible r1179 era.
+- Configuration controls use isolated S2K AceGUI widget types for the window, checkboxes, color pickers, sliders, text dropdowns, statusbar-texture dropdowns and border dropdowns; the options schema selects these types directly, without post-build decoration or label-based widget detection.
+- AceDB is not used yet; the backward-compatible custom profile database remains active.
 
 ## Nameplates
 

@@ -968,12 +968,14 @@ function ApplyChatSettings()
             if CFG.chatEnabled then
                 CaptureChatFrame(frame)
                 local _, currentFontSize = frame:GetFont()
-                frame:SetFont(fontPath, currentFontSize or 14, GetFontFlags(CFG.chatFontOutlineKey))
+                frame:SetFont("Fonts\\FRIZQT__.TTF", currentFontSize or 14, GetFontFlags(CFG.chatFontOutlineKey))
+                ApplyFontStringFont(frame, CFG.chatFontKey, currentFontSize or 14, CFG.chatFontOutlineKey, fontPath)
                 frame:SetJustifyH(CFG.chatTextAlign == "RIGHT" and "RIGHT" or "LEFT")
                 local editBox = GetChatObjects(frame)
                 if editBox then
                     local _, currentEditFontSize = editBox:GetFont()
-                    editBox:SetFont(fontPath, currentEditFontSize or currentFontSize or 14, GetFontFlags(CFG.chatFontOutlineKey))
+                    editBox:SetFont("Fonts\\FRIZQT__.TTF", currentEditFontSize or currentFontSize or 14, GetFontFlags(CFG.chatFontOutlineKey))
+                    ApplyFontStringFont(editBox, CFG.chatFontKey, currentEditFontSize or currentFontSize or 14, CFG.chatFontOutlineKey, fontPath)
                 end
                 PositionChatFrameParts(frame)
             else

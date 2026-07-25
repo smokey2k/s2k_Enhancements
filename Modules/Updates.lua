@@ -357,16 +357,42 @@ function CreateLevelFontString(ctx)
     return levelText
 end
 
-function RecreateVisibleTextObjects()
+function CreateCastFontString(ctx)
+    if not ctx or not ctx.cast then return nil end
+
+    local previousText = ctx.castText and ctx.castText:GetText() or ctx.s2kLastCastName or ""
+    local wasShown = ctx.castText and ctx.castText:IsShown()
+    if ctx.castText then
+        ctx.castText:SetText("")
+        ctx.castText:Hide()
+    end
+
+    local castText = ctx.cast:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    if castText.SetDrawLayer then castText:SetDrawLayer("OVERLAY", 7) end
+    castText:SetPoint("CENTER", ctx.cast, "CENTER", 0, 0)
+    castText:SetJustifyH("CENTER")
+    castText:SetJustifyV("MIDDLE")
+    castText:SetText(previousText)
+    castText:SetTextColor(GetCastbarSpellNameColor())
+    castText:SetShadowColor(0, 0, 0, 1)
+    castText:SetShadowOffset(1, -1)
+    ApplyFontStringFont(castText, CFG.castbarSpellNameFontKey, CFG.castbarSpellNameFontSize, CFG.castbarSpellNameFontOutlineKey, CFG.castbarSpellNameFontPath)
+    if wasShown then castText:Show() else castText:Hide() end
+
+    ctx.castText = castText
+    return castText
+end
+function RecreateVisibleTextObjects(settingKey)
     -- Some 7.3.5/private clients do not visually update certain LibSharedMedia
     -- fonts on already-created FontStrings until the nameplate is recycled.
     -- Force a true refresh by replacing our own FontStrings; this does not touch
     -- Blizzard FontStrings, only the custom s2k layers.
     for unit, ctx in pairs(State.plates) do
         if ctx and ctx.unit and UnitExists(ctx.unit) and ctx.root and ctx.root:IsShown() then
-            CreateRatioFontString(ctx)
-            CreateNameFontString(ctx)
-            CreateLevelFontString(ctx)
+            if not settingKey or settingKey == "hpRatioFontKey" then CreateRatioFontString(ctx) end
+            if not settingKey or settingKey == "nameFontKey" then CreateNameFontString(ctx) end
+            if not settingKey or settingKey == "levelOverlayFontKey" then CreateLevelFontString(ctx) end
+            if not settingKey or settingKey == "castbarSpellNameFontKey" then CreateCastFontString(ctx) end
         end
     end
 end
@@ -891,7 +917,7 @@ function UpdateContext(ctx, full)
     UpdateWAAnchors(ctx)
 end
 
-function UpdateUnit(unit, full)
+function UpdateUnit(unit, full, deferFrameOrder)
     if not CFG.enabled or not IsNameplateUnit(unit) or not UnitExists(unit) then return end
     local plate = GetPlate(unit)
     if not plate or not FrameIsVisible(plate) then
@@ -899,7 +925,12 @@ function UpdateUnit(unit, full)
         return
     end
     local ctx = GetContext(unit)
-    if ctx then UpdateContext(ctx, full) end
+    if ctx then
+        UpdateContext(ctx, full)
+        if not deferFrameOrder and SyncCustomNameplateFrameOrder then
+            SyncCustomNameplateFrameOrder()
+        end
+    end
 end
 
 function UpdateAll(full)
@@ -907,8 +938,11 @@ function UpdateAll(full)
     for i = 1, CFG.maxNameplates do
         local unit = "nameplate" .. i
         if UnitExists(unit) then
-            UpdateUnit(unit, full)
+            UpdateUnit(unit, full, true)
         end
+    end
+    if SyncCustomNameplateFrameOrder then
+        SyncCustomNameplateFrameOrder()
     end
 end
 
@@ -942,28 +976,12 @@ function RefreshVisibleTextFonts()
     ApplyVisibleTextFonts()
 end
 
-function ScheduleVisibleTextFontRefreshes(skipImmediate)
-    if not skipImmediate then ApplyVisibleTextFonts() end
-    if C_Timer and C_Timer.After then
-        for _, delay in ipairs({ 0.01, 0.03, 0.08, 0.16, 0.30, 0.60 }) do
-            C_Timer.After(delay, ApplyVisibleTextFonts)
-        end
-    end
-end
-
-function DelayedRefreshVisibleTextFonts()
-    RebuildFontOptions()
-    RememberConfiguredFontPaths()
-    ScheduleVisibleTextFontRefreshes()
-end
-
 function HideUnit(unit)
     local ctx = State.plates[unit]
     if ctx then ResetNameplateContextVisuals(ctx, true) end
     State.activeCastUnits[unit] = nil
     State.plates[unit] = nil
 end
-
 
 function ApplyVisibleStatusBarTextures()
     for _, ctx in pairs(State.plates) do
@@ -981,19 +999,86 @@ function RefreshVisibleStatusBarTextures()
     ApplyVisibleStatusBarTextures()
 end
 
-function ScheduleVisibleStatusBarTextureRefreshes(skipImmediate)
-    if not skipImmediate then ApplyVisibleStatusBarTextures() end
-    if C_Timer and C_Timer.After then
-        for _, delay in ipairs({ 0.03, 0.12, 0.30 }) do
-            C_Timer.After(delay, ApplyVisibleStatusBarTextures)
+local VISIBLE_MEDIA_REFRESH_STEPS = {
+    { 0.01, true,  false },
+    { 0.03, true,  true  },
+    { 0.08, true,  false },
+    { 0.12, false, true  },
+    { 0.16, true,  false },
+    { 0.30, true,  true  },
+    { 0.60, true,  false },
+}
+
+local function ClearVisibleMediaRefreshState(generation)
+    if State.mediaRefreshGeneration ~= generation then return end
+    State.mediaRefreshFonts = false
+    State.mediaRefreshTextures = false
+end
+
+function ScheduleVisibleMediaRefreshes(refreshFonts, refreshTextures, skipImmediate)
+    refreshFonts = refreshFonts and true or false
+    refreshTextures = refreshTextures and true or false
+    if not refreshFonts and not refreshTextures then return end
+
+    -- Merge a new request with any still-pending media work. Incrementing the
+    -- generation makes callbacks from the superseded series harmless without
+    -- relying on timer cancellation APIs that are not available on WoW 7.3.5.
+    refreshFonts = refreshFonts or State.mediaRefreshFonts
+    refreshTextures = refreshTextures or State.mediaRefreshTextures
+    State.mediaRefreshFonts = refreshFonts
+    State.mediaRefreshTextures = refreshTextures
+    State.mediaRefreshGeneration = (State.mediaRefreshGeneration or 0) + 1
+    local generation = State.mediaRefreshGeneration
+
+    if not skipImmediate then
+        if refreshFonts then ApplyVisibleTextFonts() end
+        if refreshTextures then ApplyVisibleStatusBarTextures() end
+    end
+
+    if not C_Timer or not C_Timer.After then
+        if skipImmediate then
+            if refreshFonts then ApplyVisibleTextFonts() end
+            if refreshTextures then ApplyVisibleStatusBarTextures() end
+        end
+        ClearVisibleMediaRefreshState(generation)
+        return
+    end
+
+    local lastScheduledStep
+    for index, refreshStep in ipairs(VISIBLE_MEDIA_REFRESH_STEPS) do
+        if (refreshFonts and refreshStep[2]) or (refreshTextures and refreshStep[3]) then
+            lastScheduledStep = index
+        end
+    end
+
+    for index, refreshStep in ipairs(VISIBLE_MEDIA_REFRESH_STEPS) do
+        local stepIndex = index
+        local delay = refreshStep[1]
+        local applyFonts = refreshStep[2]
+        local applyTextures = refreshStep[3]
+        if (refreshFonts and applyFonts) or (refreshTextures and applyTextures) then
+            C_Timer.After(delay, function()
+                if State.mediaRefreshGeneration ~= generation then return end
+                if refreshFonts and applyFonts then ApplyVisibleTextFonts() end
+                if refreshTextures and applyTextures then ApplyVisibleStatusBarTextures() end
+                if stepIndex == lastScheduledStep then
+                    -- The standalone preview is not part of State.plates. Refresh
+                    -- it once after the last retry so it observes the same final,
+                    -- synchronized media state as live nameplates.
+                    if UpdateNameplatePreview then UpdateNameplatePreview() end
+                    ClearVisibleMediaRefreshState(generation)
+                end
+            end)
         end
     end
 end
 
-function DelayedRefreshVisibleStatusBarTextures()
+function DelayedRefreshVisibleMedia()
+    RebuildFontOptions()
     RebuildStatusBarTextureOptions()
     RebuildBorderTextureOptions()
+    RememberConfiguredFontPaths()
     RememberConfiguredStatusBarTexturePaths()
     RememberConfiguredBorderTexturePaths()
-    ScheduleVisibleStatusBarTextureRefreshes()
+    ScheduleVisibleMediaRefreshes(true, true, false)
 end

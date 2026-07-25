@@ -2,31 +2,52 @@
 -- Events and throttled runtime updates
 -- =========================================================
 
+local function GetMediaOptionsSignature(getOptions)
+    local parts = {}
+    for _, option in ipairs(getOptions and getOptions() or {}) do
+        parts[#parts + 1] = table.concat({
+            tostring(option.key or option.value or ""),
+            tostring(option.path or ""),
+            tostring(option.label or ""),
+        }, "\031")
+    end
+    table.sort(parts)
+    return table.concat(parts, "\030")
+end
+
 function S2KNP_InitializeLoadedAddon(addonName)
     local name = tostring(addonName or ""):lower()
+    local availabilityChanged = false
     if name == "blizzard_questui" and InitializeQuestReputation then
         InitializeQuestReputation()
         if InitializeQuestTweaks then InitializeQuestTweaks() end
     elseif name == "weakauras" or name:match("^weakauras[%-%_%.]?") then
         RefreshWeakAurasRuntime(true)
+        availabilityChanged = true
     elseif name == "dominos" then
         State.dominosActionBarCount = nil
         if ScheduleDominosIntegrationApply then ScheduleDominosIntegrationApply() end
+        availabilityChanged = true
     end
 
+    local mediaChanged = false
     if DB and IsLoggedIn and IsLoggedIn() then
+        local statusBefore = GetMediaOptionsSignature(GetStatusBarTextureOptions)
+        local borderBefore = GetMediaOptionsSignature(GetBorderTextureOptions)
         RebuildStatusBarTextureOptions()
         RebuildBorderTextureOptions()
         RememberConfiguredStatusBarTexturePaths()
         RememberConfiguredBorderTexturePaths()
-        if RefreshAllOptionsPanels then RefreshAllOptionsPanels() end
+        mediaChanged = statusBefore ~= GetMediaOptionsSignature(GetStatusBarTextureOptions)
+            or borderBefore ~= GetMediaOptionsSignature(GetBorderTextureOptions)
     end
 
-    if RefreshAddonsOptionsAvailability then
+    if mediaChanged and RefreshAllOptionsPanels then
+        RefreshAllOptionsPanels()
+    elseif availabilityChanged and RefreshAddonsOptionsAvailability then
         RefreshAddonsOptionsAvailability()
     end
 end
-
 function S2KNP_InitializeDatabaseRuntime()
     if DB then return end
     EnsureDatabase()
@@ -45,7 +66,6 @@ function S2KNP_OnEvent(self, event, arg1)
             if ApplySpellQueueWindowSetting then ApplySpellQueueWindowSetting() end
             if InitializeS2KBroker then InitializeS2KBroker() end
             if InitializeS2KMinimapIcon then InitializeS2KMinimapIcon() end
-            if InitializeS2KInterfaceOptionsPanel then InitializeS2KInterfaceOptionsPanel() end
             RebuildFontOptions()
             RememberConfiguredFontPaths()
             SyncProfilerState()
@@ -76,6 +96,24 @@ function S2KNP_OnEvent(self, event, arg1)
             ApplyDominosIntegration(false)
         end
         S2KNP_ApplyModuleState()
+        if State.pendingNameplateCVarRuntimeRefresh then
+            State.pendingNameplateCVarRuntimeRefresh = false
+            UpdateAll(false)
+            ScheduleNameplateScaleStabilization()
+        end
+        return
+    end
+
+    if event == "CVAR_UPDATE" then
+        local changed, refreshRuntime = SyncNameplateSettingFromCVar(arg1)
+        if changed and refreshRuntime then
+            if InCombatLockdown and InCombatLockdown() then
+                State.pendingNameplateCVarRuntimeRefresh = true
+            else
+                UpdateAll(false)
+                ScheduleNameplateScaleStabilization()
+            end
+        end
         return
     end
 
@@ -85,7 +123,6 @@ function S2KNP_OnEvent(self, event, arg1)
         if ApplySpellQueueWindowSetting then ApplySpellQueueWindowSetting() end
         if InitializeS2KBroker then InitializeS2KBroker() end
         if InitializeS2KMinimapIcon then InitializeS2KMinimapIcon() end
-        if InitializeS2KInterfaceOptionsPanel then InitializeS2KInterfaceOptionsPanel() end
         if InitializeQuestReputation then InitializeQuestReputation() end
         if InitializeQuestTweaks then InitializeQuestTweaks() end
         if InitializeChatModule then InitializeChatModule() end
@@ -111,8 +148,7 @@ function S2KNP_OnEvent(self, event, arg1)
         ScheduleNameplateScaleStabilization()
         ClearWeakAuraGroupChildrenCache()
         RefreshWeakAurasRuntime(true)
-        DelayedRefreshVisibleTextFonts()
-        DelayedRefreshVisibleStatusBarTextures()
+        DelayedRefreshVisibleMedia()
         if ApplyChatSettings then ApplyChatSettings() end
         if ScheduleDominosIntegrationApply then ScheduleDominosIntegrationApply() end
         return

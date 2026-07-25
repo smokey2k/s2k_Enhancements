@@ -142,16 +142,6 @@ function PositionRoot(ctx)
     ApplyCustomPlateScale(ctx)
     SyncCustomFrameStrata(ctx)
 
-    if root.SetFrameLevel then
-        local level = 0
-        if plate and plate.GetFrameLevel then
-            level = math.max(level, plate:GetFrameLevel() or 0)
-        end
-        if uf and uf.GetFrameLevel then
-            level = math.max(level, uf:GetFrameLevel() or 0)
-        end
-        root:SetFrameLevel(level + 100)
-    end
     SyncCustomFrameLevels(ctx)
 
     local textureKey, pathKey = 'borderTextureKey', 'borderTexturePath'

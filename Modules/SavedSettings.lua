@@ -9,7 +9,7 @@ CVAR_OPTION_DEFS = {
     nameplateLargeBottomInset  = { cvar = "nameplateLargeBottomInset",  default = 0.15,  min = 0.00, max = 1.00, step = 0.01 },
     nameplateLargerScale       = { cvar = "nameplateLargerScale",       default = 1.20,  min = 0.50, max = 2.50, step = 0.05 },
     nameplateLargeTopInset     = { cvar = "nameplateLargeTopInset",     default = 0.15,  min = 0.00, max = 1.00, step = 0.01 },
-    nameplateMaxDistance       = { cvar = "nameplateMaxDistance",       default = 60.00, min = 10.00, max = 100.00, step = 1.00 },
+    nameplateMaxDistance       = { cvar = "nameplateMaxDistance",       default = 60.00, min = 0.00,  max = 60.00,  step = 1.00 },
     nameplateMotion            = { cvar = "nameplateMotion",            default = 0,     min = 0,    max = 2,    step = 1, integer = true },
     nameplateMotionSpeed       = { cvar = "nameplateMotionSpeed",       default = 0.025, min = 0.00, max = 1.00, step = 0.005 },
     nameplateOtherBottomInset  = { cvar = "nameplateOtherBottomInset",  default = 0.08,  min = 0.00, max = 1.00, step = 0.01 },
@@ -17,6 +17,26 @@ CVAR_OPTION_DEFS = {
     nameplateOverlapH          = { cvar = "nameplateOverlapH",          default = 0.80,  min = 0.00, max = 3.00, step = 0.05 },
     nameplateOverlapV          = { cvar = "nameplateOverlapV",          default = 1.10,  min = 0.00, max = 3.00, step = 0.05 },
 }
+
+NAMEPLATE_BOOLEAN_CVAR_DEFS = {
+    nameplateShowSelf            = { cvar = "nameplateShowSelf",            default = true  },
+    nameplateResourceOnTarget    = { cvar = "nameplateResourceOnTarget",    default = false },
+    nameplateShowAll             = { cvar = "nameplateShowAll",             default = false },
+    nameplateShowEnemies         = { cvar = "nameplateShowEnemies",         default = true  },
+    nameplateShowEnemyMinions    = { cvar = "nameplateShowEnemyMinions",    default = false },
+    nameplateShowEnemyMinus      = { cvar = "nameplateShowEnemyMinus",      default = true  },
+    nameplateShowFriends         = { cvar = "nameplateShowFriends",         default = false },
+    nameplateShowFriendlyMinions = { cvar = "nameplateShowFriendlyMinions", default = false },
+}
+
+NAMEPLATE_CVAR_KEYS_BY_NAME = {}
+for key, def in pairs(CVAR_OPTION_DEFS) do
+    NAMEPLATE_CVAR_KEYS_BY_NAME[tostring(def.cvar):lower()] = { key = key, numeric = true }
+end
+for key, def in pairs(NAMEPLATE_BOOLEAN_CVAR_DEFS) do
+    NAMEPLATE_CVAR_KEYS_BY_NAME[tostring(def.cvar):lower()] = { key = key, boolean = true }
+end
+NAMEPLATE_CVAR_KEYS_BY_NAME.nameplateotheratbase = { key = "nameplateAtBase", atBase = true }
 
 function GetNumericCVar(cvarName, fallback)
     if not GetCVar or not cvarName then
@@ -29,6 +49,14 @@ function GetNumericCVar(cvarName, fallback)
     end
 
     return value
+end
+
+function GetBooleanCVar(cvarName, fallback)
+    local value = GetNumericCVar(cvarName, nil)
+    if value == nil then
+        return fallback and true or false
+    end
+    return value ~= 0
 end
 
 WEAKAURAS_MIN_VERSION = { 2, 5, 12 }
@@ -182,8 +210,13 @@ function CopyDefaults()
     for k, v in pairs(DEFAULTS) do
         if DB[k] == nil then
             local cvarDef = CVAR_OPTION_DEFS[k]
+            local booleanCVarDef = NAMEPLATE_BOOLEAN_CVAR_DEFS[k]
             if cvarDef then
                 DB[k] = GetNumericCVar(cvarDef.cvar, cvarDef.default or v)
+            elseif booleanCVarDef then
+                DB[k] = GetBooleanCVar(booleanCVarDef.cvar, booleanCVarDef.default)
+            elseif k == "largeNameplates" then
+                DB[k] = GetNumericCVar("NamePlateVerticalScale", 1) > 1.001
             else
                 DB[k] = CopySavedValue(v)
             end
@@ -208,6 +241,11 @@ function CopyDefaults()
     for k in pairs(DEFAULTS) do
         CFG[k] = DB[k]
     end
+
+    -- Retain the legacy SavedVariables key, but make the Custom Nameplates
+    -- master switch the sole authority for Blizzard visual replacement.
+    DB.hideBlizzardVisuals = DB.enabled ~= false
+    CFG.hideBlizzardVisuals = DB.hideBlizzardVisuals
 end
 
 function SetBool(key, value)
@@ -309,4 +347,285 @@ function GetProfileOptions()
     end
 
     return options
+end
+
+-- S2K_PROFILE_ACTIONS
+function ApplyProfileSettingsNow()
+    if IsInCombat() then
+        State.pendingOptionsApply = true
+        State.pendingCVarApply = true
+        State.pendingMediaRefreshFonts = true
+        State.pendingMediaRefreshTextures = true
+        return
+    end
+
+    ApplyNameplateCVarSettings()
+    if ApplyCameraDistanceSetting then ApplyCameraDistanceSetting() end
+    if ApplySpellQueueWindowSetting then ApplySpellQueueWindowSetting() end
+    if S2KNP_ApplyModuleState then S2KNP_ApplyModuleState() end
+    if HideDisabledModuleVisuals then HideDisabledModuleVisuals() end
+    RebuildFontOptions()
+    RebuildStatusBarTextureOptions()
+    RebuildBorderTextureOptions()
+    RememberConfiguredFontPaths()
+    RememberConfiguredStatusBarTexturePaths()
+    RememberConfiguredBorderTexturePaths()
+    if RecreateNameplatePreviewTextObjects then RecreateNameplatePreviewTextObjects() end
+    if UpdateNameplatePreview then UpdateNameplatePreview() end
+    RecreateVisibleTextObjects()
+    ClearWeakAuraGroupChildrenCache()
+    MarkWeakAurasDirty()
+    MarkWeakAuraScaffoldDirty()
+    UpdateAll(true)
+    if ApplyChatSettings then ApplyChatSettings() end
+
+    if UpdateWeakAurasBinding then
+        UpdateWeakAurasBinding()
+    end
+    if RequestDominosApply then
+        RequestDominosApply()
+    end
+
+    ScheduleVisibleMediaRefreshes(true, true, true)
+    RefreshAllOptionsPanels()
+end
+
+function SwitchProfile(profileName)
+    profileName = tostring(profileName or "")
+    if profileName == "" then
+        return
+    end
+
+    EnsureDatabase()
+
+    if type(DBRoot.profiles[profileName]) ~= "table" then
+        return
+    end
+
+    DBRoot.currentProfile = profileName
+    DB = DBRoot.profiles[profileName]
+    CopyDefaults()
+    ApplyProfileSettingsNow()
+end
+
+function SaveCurrentProfileAs(profileName, switchAfterSave)
+    profileName = tostring(profileName or "")
+    profileName = profileName:gsub("^%s+", ""):gsub("%s+$", "")
+
+    if profileName == "" then
+        return
+    end
+
+    EnsureDatabase()
+
+    -- Important profile semantics:
+    -- Saving a profile should create/update a snapshot, but it should NOT
+    -- silently switch the active DB pointer. The previous modular build switched
+    -- to the newly saved profile here. That made it very easy to overwrite the
+    -- profile that was just saved while continuing to tweak settings, so several
+    -- non-default profiles could end up looking identical.
+    DBRoot.profiles[profileName] = CopyProfileTable(DB)
+
+    if switchAfterSave then
+        DBRoot.currentProfile = profileName
+        DB = DBRoot.profiles[profileName]
+        CopyDefaults()
+        ApplyProfileSettingsNow()
+    else
+        -- Keep the currently active profile untouched; only refresh the UI list.
+        RefreshAllOptionsPanels()
+    end
+
+    if S2KPrint then
+        S2KPrint("Saved profile: " .. profileName .. (switchAfterSave and " and switched to it" or ""))
+    end
+end
+
+function DeleteCurrentProfile()
+    EnsureDatabase()
+
+    local current = GetCurrentProfileName()
+    local profiles = DBRoot.profiles
+    local count = 0
+    local fallback
+
+    for name in pairs(profiles) do
+        count = count + 1
+        if name ~= current and not fallback then
+            fallback = name
+        end
+    end
+
+    if count <= 1 then
+        profiles[current] = {}
+        DB = profiles[current]
+        CopyDefaults()
+        ApplyProfileSettingsNow()
+        return
+    end
+
+    profiles[current] = nil
+    DBRoot.currentProfile = fallback or "Default"
+
+    if type(profiles[DBRoot.currentProfile]) ~= "table" then
+        profiles[DBRoot.currentProfile] = {}
+    end
+
+    DB = profiles[DBRoot.currentProfile]
+    CopyDefaults()
+    ApplyProfileSettingsNow()
+end
+
+function ResetCurrentProfile()
+    EnsureDatabase()
+
+    local current = GetCurrentProfileName()
+    DBRoot.profiles[current] = {}
+    DB = DBRoot.profiles[current]
+    CopyDefaults()
+    ApplyProfileSettingsNow()
+end
+
+function ResetNameplateCVarSettingsToDefaults()
+    EnsureDatabase()
+
+    -- nameplateOtherAtBase is exposed as a checkbox outside CVAR_OPTION_DEFS.
+    -- Reset it together with the other Blizzard nameplate CVars.
+    SetBool("nameplateAtBase", DEFAULTS.nameplateAtBase and true or false)
+
+    for key, def in pairs(CVAR_OPTION_DEFS) do
+        SetNum(key, def.default or DEFAULTS[key] or 0)
+    end
+    SetBool("largeNameplates", DEFAULTS.largeNameplates and true or false)
+    for key, def in pairs(NAMEPLATE_BOOLEAN_CVAR_DEFS) do
+        SetBool(key, def.default and true or false)
+    end
+
+    ApplyProfileSettingsNow()
+end
+
+function CopyProfileToCurrent(profileName)
+    profileName = tostring(profileName or "")
+    profileName = profileName:gsub("^%s+", ""):gsub("%s+$", "")
+
+    if profileName == "" then
+        if S2KPrint then S2KPrint("No source profile selected.") end
+        return false
+    end
+
+    EnsureDatabase()
+
+    local current = GetCurrentProfileName()
+    local source = DBRoot.profiles and DBRoot.profiles[profileName]
+
+    if type(source) ~= "table" then
+        if S2KPrint then S2KPrint("Profile not found: " .. tostring(profileName)) end
+        return false
+    end
+
+    if profileName == current then
+        if S2KPrint then S2KPrint("Source profile is already the current profile; nothing copied.") end
+        return false
+    end
+
+    -- Copy FROM the selected source profile INTO the currently active profile.
+    -- Important: keep DBRoot.currentProfile unchanged. Only the current profile's
+    -- settings table is replaced by a deep copy of the source settings.
+    DBRoot.profiles[current] = CopyProfileTable(source)
+    DBRoot.currentProfile = current
+    DB = DBRoot.profiles[current]
+    CopyDefaults()
+    ApplyProfileSettingsNow()
+
+    if S2KPrint then
+        S2KPrint("Copied profile '" .. tostring(profileName) .. "' into current profile '" .. tostring(current) .. "'.")
+    end
+
+    return true
+end
+
+local function GetFirstAvailableProfileName(excludeCurrent)
+    local current = GetCurrentProfileName()
+    local first
+    for _, option in ipairs(GetProfileOptions()) do
+        local key = tostring(option.key or "")
+        if key ~= "" then
+            first = first or key
+            if excludeCurrent and key ~= current then return key end
+        end
+    end
+    return first or current or "Default"
+end
+
+function GetSelectedCopySourceProfileName()
+    EnsureDatabase()
+
+    local selected = State.profileCopySourceName
+    if type(selected) ~= "string" or selected == "" or not (DBRoot and DBRoot.profiles and DBRoot.profiles[selected]) then
+        selected = GetFirstAvailableProfileName(true)
+        State.profileCopySourceName = selected
+    end
+
+    return selected
+end
+
+function CopySelectedProfileToCurrent()
+    local selected = GetSelectedCopySourceProfileName()
+    return CopyProfileToCurrent(selected)
+end
+
+
+function S2KNP_PrintProfileList()
+    EnsureDatabase()
+    print("---- s2k:Enhancements profiles ----")
+    print("Current: " .. tostring(GetCurrentProfileName()))
+    for _, option in ipairs(GetProfileOptions()) do
+        local name = tostring(option.key or "")
+        local mark = (name == GetCurrentProfileName()) and "*" or " "
+        print(mark .. " " .. name)
+    end
+    print("Commands: /s2knpprof list | /s2knpprof load NAME | /s2knpprof save NAME | /s2knpprof save-switch NAME | /s2knpprof copyfrom NAME")
+end
+
+SLASH_S2KNPPROFILES1 = "/s2keprof"
+SLASH_S2KNPPROFILES2 = "/s2knpprof"
+SlashCmdList["S2KNPPROFILES"] = function(msg)
+    msg = tostring(msg or ""):gsub("^%s+", ""):gsub("%s+$", "")
+    local lower = msg:lower()
+
+    if lower == "" or lower == "list" or lower == "help" or lower == "?" then
+        S2KNP_PrintProfileList()
+        return
+    end
+
+    local name = msg:match("^[Ll][Oo][Aa][Dd]%s+(.+)$")
+    if name then
+        SwitchProfile(name)
+        S2KNP_PrintProfileList()
+        return
+    end
+
+    name = msg:match("^[Ss][Aa][Vv][Ee]%s+(.+)$")
+    if name then
+        SaveCurrentProfileAs(name, false)
+        S2KNP_PrintProfileList()
+        return
+    end
+
+    name = msg:match("^[Ss][Aa][Vv][Ee][%-_ ]?[Ss][Ww][Ii][Tt][Cc][Hh]%s+(.+)$")
+    if name then
+        SaveCurrentProfileAs(name, true)
+        S2KNP_PrintProfileList()
+        return
+    end
+
+    name = msg:match("^[Cc][Oo][Pp][Yy][Ff][Rr][Oo][Mm]%s+(.+)$") or msg:match("^[Cc][Oo][Pp][Yy]%s+[Ff][Rr][Oo][Mm]%s+(.+)$")
+    if name then
+        State.profileCopySourceName = tostring(name or "")
+        CopyProfileToCurrent(name)
+        S2KNP_PrintProfileList()
+        return
+    end
+
+    print("s2k:Enhancements: unknown profile command. Use /s2knpprof list")
 end

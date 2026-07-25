@@ -1,5 +1,5 @@
 -- =========================================================
--- Options UI
+-- Options application
 -- =========================================================
 
 UpdateWeakAurasBinding = nil
@@ -134,10 +134,6 @@ local function WriteCameraDistanceSetting(value)
     if SetCVar then pcall(SetCVar, cvarName, textValue) end
     local actual = GetCVar and tonumber(GetCVar(cvarName)) or nil
 
-    if (not actual or math.abs(actual - value) > 0.001) and C_CVar and type(C_CVar.SetCVar) == "function" then
-        pcall(C_CVar.SetCVar, cvarName, textValue)
-        actual = GetCVar and tonumber(GetCVar(cvarName)) or actual
-    end
     if (not actual or math.abs(actual - value) > 0.001) and ConsoleExec then
         pcall(ConsoleExec, cvarName .. " " .. textValue)
         actual = GetCVar and tonumber(GetCVar(cvarName)) or actual
@@ -180,12 +176,31 @@ function ApplyCameraDistanceSetting(forceClamp)
 end
 function ApplyOptionsNow()
     State.pendingOptionsApply = false
+    local refreshFonts = State.pendingMediaRefreshFonts and true or false
+    local refreshTextures = State.pendingMediaRefreshTextures and true or false
+    State.pendingMediaRefreshFonts = false
+    State.pendingMediaRefreshTextures = false
+    if refreshFonts then
+        RebuildFontOptions()
+        RememberConfiguredFontPaths()
+        RecreateVisibleTextObjects()
+        if RecreateNameplatePreviewTextObjects then RecreateNameplatePreviewTextObjects() end
+        if UpdateNameplatePreview then UpdateNameplatePreview() end
+    end
+    if refreshTextures then
+        RebuildStatusBarTextureOptions()
+        RebuildBorderTextureOptions()
+        RememberConfiguredStatusBarTexturePaths()
+        RememberConfiguredBorderTexturePaths()
+    end
     SyncProfilerState()
     ApplyNameplateCVarSettings()
-    ApplyCameraDistanceSetting()
     ApplySpellQueueWindowSetting()
     if S2KNP_ApplyModuleState then S2KNP_ApplyModuleState() end
     UpdateAll(true)
+    if refreshFonts or refreshTextures then
+        ScheduleVisibleMediaRefreshes(refreshFonts, refreshTextures, true)
+    end
     if ScheduleNameplateScaleStabilization then
         ScheduleNameplateScaleStabilization()
     end
@@ -220,8 +235,12 @@ function RequestApply()
 end
 
 function RequestStatusBarTextureRefresh()
+    -- The preview uses addon-owned, unprotected frames and may update immediately.
+    if UpdateNameplatePreview then UpdateNameplatePreview() end
+
     if IsInCombat() then
         State.pendingOptionsApply = true
+        State.pendingMediaRefreshTextures = true
         return
     end
 
@@ -230,5 +249,49 @@ function RequestStatusBarTextureRefresh()
     RememberConfiguredStatusBarTexturePaths()
     RememberConfiguredBorderTexturePaths()
     UpdateAll(true)
-    ScheduleVisibleStatusBarTextureRefreshes(true)
+    ScheduleVisibleMediaRefreshes(false, true, true)
+end
+
+-- S2K_CONFIG_ACTIONS
+function RequestTextFontRefresh(settingKey)
+    local chatFont = settingKey == "chatFontKey" or settingKey == "chatFontOutlineKey"
+    if chatFont then
+        RebuildFontOptions()
+        RememberConfiguredFontPaths()
+        if ApplyChatSettings then ApplyChatSettings() end
+        return
+    end
+
+    -- Resolve and persist the newly selected media path before any preview or
+    -- runtime FontString tries to consume it.
+    RebuildFontOptions()
+    RememberConfiguredFontPaths()
+    if RecreateNameplatePreviewTextObjects then RecreateNameplatePreviewTextObjects(settingKey) end
+    if UpdateNameplatePreview then UpdateNameplatePreview() end
+
+    if IsInCombat() then
+        State.pendingOptionsApply = true
+        State.pendingMediaRefreshFonts = true
+        return
+    end
+
+    RecreateVisibleTextObjects(settingKey)
+    UpdateAll(true)
+    if tostring(settingKey or ""):match("FontKey$") then
+        ScheduleVisibleMediaRefreshes(true, false, true)
+    end
+end
+
+function RequestColorRefresh(settingPrefix)
+    if UpdateNameplatePreview then UpdateNameplatePreview() end
+    if IsInCombat() then
+        State.pendingOptionsApply = true
+        return
+    end
+
+    if tostring(settingPrefix or ""):match("^chat") then
+        if ApplyChatSettings then ApplyChatSettings() end
+    else
+        UpdateAll(true)
+    end
 end

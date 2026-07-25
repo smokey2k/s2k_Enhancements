@@ -80,7 +80,7 @@ A támogatott környezet WoW 7.3.5 és legalább WeakAuras 2.5.12. Az integráci
 
 A profilok a s2k_EnhancementsDB SavedVariables adatbázisban tárolódnak. A korábbi s2k_NameplatesDB, a régi _G.s2k_Nameplates API és a korábbi slash parancsok kompatibilitási célból megmaradnak.
 
-A konfiguráció és a profilrendszer jelenleg saját implementáció; még nem használ AceConfig, AceGUI vagy AceDB könyvtárat.
+A konfigurációs felület a WoW 7.3.5-höz rögzített AceGUI-3.0 és AceConfig-3.0 könyvtárakat használja. A profil- és SavedVariables-réteg továbbra is a visszafelé kompatibilis saját implementáció; AceDB migráció még nem történt.
 
 ## Fő parancsok
 

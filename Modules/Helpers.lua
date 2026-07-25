@@ -176,24 +176,12 @@ function GetReactionColor(unit)
     return 0.85, 0.75, 0.1
 end
 
-BORDER_THICKNESS_BY_KEY = {}
-for _, option in ipairs(BORDER_STYLE_OPTIONS or {}) do
-    BORDER_THICKNESS_BY_KEY[option.key] = tonumber(option.thickness) or 0
-end
-
 function GetCustomColor(prefix, fallbackR, fallbackG, fallbackB, fallbackA)
     local r = tonumber(CFG[prefix .. "R"]) or fallbackR or 1
     local g = tonumber(CFG[prefix .. "G"]) or fallbackG or 1
     local b = tonumber(CFG[prefix .. "B"]) or fallbackB or 1
     local a = tonumber(CFG[prefix .. "A"]) or fallbackA or 1
     return r, g, b, a
-end
-
-function SetCustomColor(prefix, r, g, b, a)
-    SetNum(prefix .. "R", r or 1)
-    SetNum(prefix .. "G", g or 1)
-    SetNum(prefix .. "B", b or 1)
-    SetNum(prefix .. "A", a == nil and 1 or a)
 end
 
 function GetHealthbarColor(unit)
@@ -280,28 +268,28 @@ function GetHPMarkerEffectiveColor(ctx)
     return GetHPMarkerColor()
 end
 
-function GetBorderThickness(styleKey)
-    local value = BORDER_THICKNESS_BY_KEY[styleKey]
-    if value == nil then value = BORDER_THICKNESS_BY_KEY.THIN or 1 end
-    return value
-end
-
 function SetCVarIfChanged(cvarName, value)
-    if not SetCVar or not cvarName then return end
+    if not SetCVar or not cvarName then return false end
 
     local textValue = tostring(value)
     if GetCVar then
-        local current = tostring(GetCVar(cvarName) or "")
-        if current == textValue then return end
+        local ok, currentValue = pcall(GetCVar, cvarName)
+        if not ok or currentValue == nil then
+            return false
+        end
+
+        local current = tostring(currentValue)
+        if current == textValue then return false end
 
         -- Avoid writes for formatting-only differences such as 1 and 1.0.
         local currentNumber, newNumber = tonumber(current), tonumber(textValue)
         if currentNumber and newNumber and math.abs(currentNumber - newNumber) < 0.000001 then
-            return
+            return false
         end
     end
 
     SetCVar(cvarName, textValue)
+    return true
 end
 
 function ApplyNameplateBaseCVar()
@@ -330,8 +318,13 @@ function ApplyNameplateCVarSettings()
     end
 
     State.pendingCVarApply = false
+    State.applyingNameplateCVars = true
     ApplyNameplateBaseCVar()
     ApplyNameplateHitboxSize()
+
+    local large = CFG.largeNameplates == true
+    local largeModeChanged = SetCVarIfChanged("NamePlateHorizontalScale", large and 1.4 or 1.0)
+    largeModeChanged = SetCVarIfChanged("NamePlateVerticalScale", large and 2.7 or 1.0) or largeModeChanged
 
     for key, def in pairs(CVAR_OPTION_DEFS) do
         local value = tonumber(CFG[key])
@@ -345,4 +338,68 @@ function ApplyNameplateCVarSettings()
 
         SetCVarIfChanged(def.cvar, value)
     end
+
+    for key, def in pairs(NAMEPLATE_BOOLEAN_CVAR_DEFS or {}) do
+        SetCVarIfChanged(def.cvar, CFG[key] and 1 or 0)
+    end
+
+    if largeModeChanged and NamePlateDriverFrame and NamePlateDriverFrame.UpdateNamePlateOptions then
+        pcall(NamePlateDriverFrame.UpdateNamePlateOptions, NamePlateDriverFrame)
+    end
+    State.applyingNameplateCVars = false
+end
+
+function SyncNameplateSettingFromCVar(cvarName)
+    if State.applyingNameplateCVars or not DB or not CFG then
+        return false, false
+    end
+
+    local normalized = tostring(cvarName or ""):lower()
+    if normalized == "" then
+        return false, false
+    end
+
+    if normalized == "nameplatehorizontalscale" or normalized == "nameplateverticalscale" then
+        local vertical = GetNumericCVar("NamePlateVerticalScale", 1)
+        local large = vertical > 1.001
+        if CFG.largeNameplates ~= large then
+            SetBool("largeNameplates", large)
+            return true, true
+        end
+        return false, false
+    end
+
+    local mapping = NAMEPLATE_CVAR_KEYS_BY_NAME and NAMEPLATE_CVAR_KEYS_BY_NAME[normalized]
+    if not mapping then
+        return false, false
+    end
+
+    if mapping.boolean then
+        local value = GetBooleanCVar(cvarName, CFG[mapping.key])
+        if CFG[mapping.key] ~= value then
+            SetBool(mapping.key, value)
+            return true, false
+        end
+    elseif mapping.atBase then
+        local value = GetNumericCVar(cvarName, 0) == 2
+        if CFG[mapping.key] ~= value then
+            SetBool(mapping.key, value)
+            return true, false
+        end
+    elseif mapping.numeric then
+        local def = CVAR_OPTION_DEFS[mapping.key]
+        local value = GetNumericCVar(cvarName, def and def.default or CFG[mapping.key])
+        if def and def.integer then
+            value = math.floor(value + 0.5)
+        end
+        if tonumber(CFG[mapping.key]) ~= value then
+            SetNum(mapping.key, value)
+            local refreshScale = mapping.key == "nameplateGlobalScale"
+                or mapping.key == "nameplateSelectedScale"
+                or mapping.key == "nameplateLargerScale"
+            return true, refreshScale
+        end
+    end
+
+    return false, false
 end

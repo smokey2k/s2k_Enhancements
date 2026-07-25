@@ -225,10 +225,20 @@ function ApplyFontStringFont(text, fontKey, size, outlineKey, savedPath)
     local function TrySetFont(path)
         if not path or path == "" then return false end
         local ok, applied = pcall(text.SetFont, text, path, fontSize, flags)
-        -- In most clients SetFont returns 1/true on success. Some older/private clients
-        -- return nil despite applying the font, so a clean pcall still counts as usable.
-        -- A hard false is treated as failure so we can try path variants.
-        return ok and applied ~= false
+        if not ok then return false end
+        if applied then return true end
+
+        -- Some 7.3.5/private clients return nil even after applying the font.
+        -- Verify the FontString's effective path instead of treating a clean
+        -- pcall or a nil return value as conclusive on its own.
+        if text.GetFont then
+            local currentPath = text:GetFont()
+            local function Normalize(value)
+                return tostring(value or ""):gsub("/", "\\"):lower()
+            end
+            return Normalize(currentPath) == Normalize(path)
+        end
+        return false
     end
 
     local path = tostring(font.path)
