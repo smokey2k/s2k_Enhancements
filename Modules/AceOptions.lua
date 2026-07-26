@@ -46,6 +46,11 @@ local paths = {
  castbarBackdropTextureKey="castbarBackdropTexturePath",playerCastOverlaySparkTextureKey="playerCastOverlaySparkTexturePath",
  borderTextureKey="borderTexturePath",targetBorderTextureKey="targetBorderTexturePath",castbarBorderTextureKey="castbarBorderTexturePath",
 }
+for _,group in ipairs(NAMEPLATE_DESIGN_GROUPS or {}) do
+ paths[group.."HealthTextureKey"]=group.."HealthTexturePath"
+ paths[group.."HealthBackdropTextureKey"]=group.."HealthBackdropTexturePath"
+ paths[group.."BorderTextureKey"]=group.."BorderTexturePath"
+end
 local fonts={hpRatioFontKey=1,hpRatioFontOutlineKey=1,hpRatioFontSize=1,nameFontKey=1,nameFontOutlineKey=1,nameFontSize=1,
  castbarSpellNameFontKey=1,castbarSpellNameFontOutlineKey=1,castbarSpellNameFontSize=1,levelOverlayFontKey=1,
  levelOverlayFontOutlineKey=1,levelOverlayFontSize=1,chatFontKey=1,chatFontOutlineKey=1}
@@ -125,8 +130,11 @@ end
 local function E(n,f,d,disabled)return{type="execute",name=L(n),desc=L(d or n),func=f,disabled=disabled}end
 local function D(text,size)return{type="description",name=type(text)=="function" and text or L(text),fontSize=size or "medium"}end
 local function G(n,args,disabled)return{type="group",name=L(n),inline=true,args=args,disabled=disabled}end
+local function InlineTabs(n,args,disabled)
+ local group=G(n,args,disabled);group.childGroups="tab";group.arg="S2K_INLINE_TABS";return group
+end
+local function Tab(n,args,disabled)return{type="group",name=L(n),args=args,disabled=disabled}end
 local function NPDisabled()return not CFG or CFG.enabled==false end
-local function TargetDisabled()return NPDisabled() or not CFG.targetHealthbarOverride end
 local function WADisabled()return not(GetWeakAurasCompatibilityStatus and select(1,GetWeakAurasCompatibilityStatus()))end
 local function DomDisabled()return not(GetDominosCompatibilityStatus and select(1,GetDominosCompatibilityStatus()))end
 local function AssignOrder(args)local keys={};for k in pairs(args)do keys[#keys+1]=k end;table.sort(keys);for i,k in ipairs(keys)do args[k].order=args[k].order or i end;return args end
@@ -181,22 +189,19 @@ local function NPGeneral()
   a=T("enabled","Custom nameplates","Replaces Blizzard nameplate visuals with the custom s2k nameplates."),
  }))
  local dimensions=G("Dimensions",AssignOrder({
-  a=T("largeNameplates","Large nameplates"),
-  b=R("nameplateGlobalScale","Global nameplate scale",.5,2,.05),
-  c=R("nameplateLargerScale","Large nameplate scale",.5,2.5,.05),
-  d=R("nameplateSelectedScale","Selected nameplate scale",.5,2.5,.05),
-  e=R("nameplateMaxDistance","Nameplate max distance",0,60,1),
-  f=R("nameplateLargeBottomInset","Nameplate large bottom inset",0,1,.01),
-  g=R("nameplateLargeTopInset","Nameplate large top inset",0,1,.01),
-  h=R("nameplateOtherBottomInset","Nameplate other bottom inset",0,1,.01),
-  i=R("nameplateOtherTopInset","Nameplate other top inset",0,1,.01),
-  j=R("nameplateOverlapH","Nameplate horizontal overlap",0,3,.05),
-  k=R("nameplateOverlapV","Nameplate vertical overlap",0,3,.05),
-  l=R("nameplateMotionSpeed","Nameplate motion speed",0,1,.005),
-  m=NS("nameplateMotion","Nameplate motion type",NAMEPLATE_MOTION_OPTIONS),
-  n=E("Reset CVars to defaults",function()ResetNameplateCVarSettingsToDefaults()end),
+  a=R("nameplateGlobalScale","Global nameplate scale",.5,2,.05),
+  b=R("nameplateSelectedScale","Selected nameplate scale",.5,2.5,.05),
+  c=R("nameplateMaxDistance","Nameplate max distance",0,60,1),
+  d=R("nameplateOtherBottomInset","Nameplate other bottom inset",0,1,.01),
+  e=R("nameplateOtherTopInset","Nameplate other top inset",0,1,.01),
+  f=R("nameplateOverlapH","Nameplate horizontal overlap",0,3,.05),
+  g=R("nameplateOverlapV","Nameplate vertical overlap",0,3,.05),
+  h=R("nameplateMotionSpeed","Nameplate motion speed",0,1,.005),
+  i=NS("nameplateMotion","Nameplate motion type",NAMEPLATE_MOTION_OPTIONS),
+  j=T("nameplateAtBase","Nameplates at unit feet / base"),
+  k=E("Reset CVars to defaults",function()ResetNameplateCVarSettingsToDefaults()end),
  }))
- local units=G("Units",AssignOrder({
+ local unitArgs=AssignOrder({
   a=T("nameplateShowSelf","Personal resource display"),
   b=T("nameplateResourceOnTarget","Show special resources on target"),
   c=T("nameplateShowAll","Always show nameplates","When disabled, Blizzard controls the usual combat-based nameplate visibility."),
@@ -205,56 +210,78 @@ local function NPGeneral()
   f=T("nameplateShowEnemyMinus","Enemy unit minor"),
   g=T("nameplateShowFriends","Friendly players"),
   h=T("nameplateShowFriendlyMinions","Friendly player minions"),
- }))
- master.order=1;dimensions.order=2;units.order=3
+ })
+ for _,option in pairs(unitArgs)do option.width=CONTROL_WIDTH/170 end
+ local units=G("Units",unitArgs)
+ master.order=1;units.order=2;dimensions.order=3
  return{master=master,dimensions=dimensions,units=units}
 end
+local function NameplateDimensions(group,label)
+ return {type="group",name=L(label),args=AssignOrder({
+  h=R(group.."PlateHeight","Healthbar height",4,80,1),w=R(group.."PlateWidth","Healthbar width",50,500,1),
+  hh=R(group.."NameplateHitboxHeight","Hitbox height",10,200,1),hw=R(group.."NameplateHitboxWidth","Hitbox width",50,500,1),
+  x=R(group.."HealthbarHitboxXOffset","Healthbar X offset in hitbox",-250,250,1),y=R(group.."HealthbarHitboxYOffset","Healthbar Y offset in hitbox",-100,100,1),
+  strata=S(group.."HealthbarFrameStrata","Frame strata",FRAME_STRATA_OPTIONS),
+ }),disabled=NPDisabled}
+end
+local function NameplateDesign(group,label,includePlayerCast)
+ local overlays=AssignOrder({
+  name=T(group.."ShowNames","Unit name overlay"),ratio=T(group.."ShowHPRatio","HP ratio overlay"),
+  level=T(group.."ShowLevelOverlay","Unit level overlay"),marker=T(group.."ShowHPMarker","HP threshold marker"),
+ })
+ if includePlayerCast then overlays.cast=T("targetPlayerCastOverlayEnabled","Player cast overlay") end
+ return {type="group",name=L(label),args=AssignOrder({
+  tex=S(group.."HealthTextureKey","Healthbar texture",GetStatusBarTextureOptions,nil,true),
+  color=C(group.."HealthColor","Healthbar color"),
+  reaction=T(group.."HealthUseReactionColor","Use unit reaction colors"),
+  bg=S(group.."HealthBackdropTextureKey","Healthbar backdrop texture",GetStatusBarTextureOptions,nil,true),
+  bgc=C(group.."HealthBackdropColor","Healthbar backdrop color"),
+  bt=S(group.."BorderTextureKey","Healthbar border texture",GetBorderTextureOptions,nil,true),
+  bc=C(group.."BorderColor","Healthbar border color"),
+  bs=R(group.."BorderSize","Healthbar border size",1,64,1),
+  bi=R(group.."BorderInset","Healthbar border inset",-32,32,1),
+  bo=R(group.."BorderOffset","Healthbar border offset",0,32,1),
+  overlays=G("Overlays",overlays,NPDisabled),
+  markerColor=C(group.."HPMarkerColor","HP threshold marker color"),
+ }),disabled=NPDisabled}
+end
 local function Health()
- local layout=AssignOrder({
-  w=R("plateWidth","Healthbar width",50,500,1),h=R("plateHeight","Healthbar height",4,80,1),
-  hw=R("nameplateHitboxWidth","Nameplate hitbox width",50,500,1),hh=R("nameplateHitboxHeight","Nameplate hitbox height",10,200,1),
-  x=R("healthbarHitboxXOffset","Healthbar center X offset",-250,250,1),y=R("healthbarHitboxYOffset","Healthbar center Y offset",-100,100,1),
- })
- local general=AssignOrder({
-  strata=S("healthbarFrameStrata","Healthbar frame strata",FRAME_STRATA_OPTIONS),tex=S("healthTextureKey","Healthbar texture",GetStatusBarTextureOptions,nil,true),
-  reaction=T("healthUseReactionColor","Use unit reaction color"),color=C("healthColor","Custom healthbar color"),
-  bg=S("healthBackdropTextureKey","Healthbar backdrop texture",GetStatusBarTextureOptions,nil,true),bgc=C("healthBackdropColor","Healthbar backdrop color"),
-  bs=R("borderSize","Border size",1,64,1),bi=R("borderInset","Border inset",-32,32,1),bo=R("borderOffset","Border offset",0,32,1),
-  bt=S("borderTextureKey","All nameplates border texture",GetBorderTextureOptions,nil,true),bc=C("borderColor","All nameplates border color"),
- })
- local target=AssignOrder({
-  tick=T("moduleTargetRuntimeHealthEnabled","Target health runtime tick"),override=T("targetHealthbarOverride","Use separate target healthbar"),
-  strata=S("targetHealthbarFrameStrata","Target healthbar frame strata",FRAME_STRATA_OPTIONS,nil,false,TargetDisabled),
-  tex=S("targetHealthTextureKey","Healthbar texture",GetStatusBarTextureOptions,nil,true,TargetDisabled),
-  react=T("targetHealthUseReactionColor","Use unit reaction color",nil,TargetDisabled),color=C("targetHealthColor","Custom healthbar color",TargetDisabled),
-  bg=S("targetHealthBackdropTextureKey","Healthbar backdrop texture",GetStatusBarTextureOptions,nil,true,TargetDisabled),bgc=C("targetHealthBackdropColor","Healthbar backdrop color",TargetDisabled),
-  bs=R("targetBorderSize","Border size",1,64,1,nil,TargetDisabled),bi=R("targetBorderInset","Border inset",-32,32,1,nil,TargetDisabled),
-  bo=R("targetBorderOffset","Border offset",0,32,1,nil,TargetDisabled),bt=S("targetBorderTextureKey","Target border texture",GetBorderTextureOptions,nil,true,TargetDisabled),
-  bc=C("targetBorderColor","Target border color",TargetDisabled),
- })
- return{layout=G("Shared healthbar and hitbox",layout,NPDisabled),general=G("General healthbar appearance",general,NPDisabled),target=G("Target healthbar",target,NPDisabled)}
+ local friendlyDimensions=NameplateDimensions("friendly","Friendly");friendlyDimensions.order=1
+ local enemyDimensions=NameplateDimensions("enemy","Enemy");enemyDimensions.order=2
+ local dimensions=InlineTabs("Nameplate Dimensions",{friendly=friendlyDimensions,enemy=enemyDimensions},NPDisabled)
+ dimensions.order=1
+ local target=NameplateDesign("target","Target",true);target.order=1
+ local focus=NameplateDesign("focus","Focus",false);focus.order=2
+ local friendly=NameplateDesign("friendly","Friendly",false);friendly.order=3
+ local enemy=NameplateDesign("enemy","Enemy",false);enemy.order=4
+ local design=InlineTabs("Nameplate Design",{target=target,focus=focus,friendly=friendly,enemy=enemy},NPDisabled)
+ design.order=2
+ return{dimensions=dimensions,design=design}
 end
 local function Cast()
- return{
-  main=G("Castbar",AssignOrder({show=T("showCastbar","Show Castbar"),h=R("castbarHeight","Castbar height",2,30,1),y=R("castbarYOffset","Castbar Y offset",-40,20,1),
+ local tabs={
+  main=Tab("Castbar",AssignOrder({show=T("showCastbar","Show Castbar"),h=R("castbarHeight","Castbar height",2,30,1),y=R("castbarYOffset","Castbar Y offset",-40,20,1),
    tex=S("castbarTextureKey","Castbar texture",GetStatusBarTextureOptions,nil,true),bg=S("castbarBackdropTextureKey","Castbar backdrop texture",GetStatusBarTextureOptions,nil,true),
    bgc=C("castbarBackdropColor","Castbar backdrop color"),color=C("castbarColor","Castbar color")}),NPDisabled),
-  border=G("Castbar border",AssignOrder({show=T("castbarBorder","Show castbar border"),tex=S("castbarBorderTextureKey","Castbar border texture",GetBorderTextureOptions,nil,true),
+  border=Tab("Castbar border",AssignOrder({show=T("castbarBorder","Show castbar border"),tex=S("castbarBorderTextureKey","Castbar border texture",GetBorderTextureOptions,nil,true),
    s=R("castbarBorderSize","Castbar border size",1,64,1),i=R("castbarBorderInset","Castbar border inset",-32,32,1),o=R("castbarBorderOffset","Castbar border offset",0,32,1),c=C("castbarBorderColor","Castbar border color")}),NPDisabled),
-  text=G("Spell name and icon",AssignOrder({show=T("showCastbarSpellName","Show castbar spell name"),font=S("castbarSpellNameFontKey","Castbar spell name font",GetFontOptions),
+  text=Tab("Spell name and icon",AssignOrder({show=T("showCastbarSpellName","Show castbar spell name"),font=S("castbarSpellNameFontKey","Castbar spell name font",GetFontOptions),
    size=R("castbarSpellNameFontSize","Castbar spell name font size",6,24,1),outline=S("castbarSpellNameFontOutlineKey","Castbar spell name font outline",FONT_OUTLINE_OPTIONS),
    color=C("castbarSpellNameColor","Castbar spell name color"),icon=T("showCastbarIcon","Show custom castbar icon"),is=R("castbarIconSize","Castbar icon size",8,40,1),gap=R("castbarIconGap","Castbar icon gap",0,20,1)}),NPDisabled),
  }
+ tabs.main.order=1;tabs.border.order=2;tabs.text.order=3
+ return{settings=InlineTabs("Castbar",tabs,NPDisabled)}
 end
 local function Overlays()
- return{
-  modules=G("Overlay modules",AssignOrder({n=T("showNames","Unit name overlay"),r=T("hpRatioText","HP ratio overlay"),l=T("levelOverlayEnabled","Unit level overlay"),m=T("hpMarkerEnabled","HP threshold marker"),p=T("playerCastOverlayEnabled","Player Cast overlay")}),NPDisabled),
-  names=G("Unit name overlay",AssignOrder({s=R("nameFontSize","Name font size",6,24,1),y=R("nameYOffset","Name Y offset",-60,40,1),level=R("nameOverlayFrameLevel","Unit name overlay frame level",1,100,1),f=S("nameFontKey","Unit name font",GetFontOptions),o=S("nameFontOutlineKey","Unit name font outline",FONT_OUTLINE_OPTIONS)}),NPDisabled),
-  cast=G("Player cast overlay",AssignOrder({c=C("playerCastOverlayColor","Player cast overlay color"),l=R("playerCastOverlayFrameLevel","Player cast overlay frame level",1,100,1),e=T("playerCastOverlaySparkEnabled","Enable player cast overlay spark"),t=S("playerCastOverlaySparkTextureKey","Spark texture",GetStatusBarTextureOptions,nil,true),sc=C("playerCastOverlaySparkColor","Spark color"),w=R("playerCastOverlaySparkWidth","Spark width",1,12,1)}),NPDisabled),
-  ratio=G("HP ratio overlay",AssignOrder({g=T("hpRatioOnlyGreaterThanPlayer","Show HP ratio only when unit max HP is greater than player max HP"),s=R("hpRatioFontSize","HP ratio font size",6,24,1),y=R("hpRatioYOffset","HP ratio Y offset",-40,40,1),l=R("hpRatioFrameLevel","HP ratio frame level",1,100,1),f=S("hpRatioFontKey","HP ratio font",GetFontOptions),o=S("hpRatioFontOutlineKey","HP ratio font outline",FONT_OUTLINE_OPTIONS),c=C("hpRatioColor","HP ratio font color")}),NPDisabled),
-  level=G("Unit level overlay",AssignOrder({x=R("levelOverlayXOffset","Level X offset",-160,160,1),y=R("levelOverlayYOffset","Level Y offset",-80,80,1),s=R("levelOverlayFontSize","Level font size",6,32,1),f=S("levelOverlayFontKey","Level font",GetFontOptions),o=S("levelOverlayFontOutlineKey","Level font outline",FONT_OUTLINE_OPTIONS),a=S("levelOverlayAlign","Level align / growth",LEVEL_OVERLAY_ALIGN_OPTIONS),c=C("levelOverlayColor","Level color"),l=R("levelOverlayFrameLevel","Level overlay frame level",1,100,1)}),NPDisabled),
-  marker=G("HP threshold marker",AssignOrder({t=T("hpMarkerOnlyTarget","Show marker only on current target"),b=T("hpMarkerUseBorderColor","Use current nameplate border color"),p=R("hpMarkerPercent","Marker position percent",0,100,1),m=S("hpMarkerWidthMode","Marker width mode",HP_MARKER_WIDTH_MODE_OPTIONS),w=R("hpMarkerWidth","Fixed line width",1,20,1),c=C("hpMarkerColor","Marker color / alpha"),l=R("hpMarkerFrameLevel","Marker frame level",1,100,1)}),NPDisabled),
+ local tabs={
+  names=Tab("Unit name overlay",AssignOrder({s=R("nameFontSize","Name font size",6,24,1),y=R("nameYOffset","Name Y offset",-60,40,1),level=R("nameOverlayFrameLevel","Unit name overlay frame level",1,100,1),f=S("nameFontKey","Unit name font",GetFontOptions),o=S("nameFontOutlineKey","Unit name font outline",FONT_OUTLINE_OPTIONS)}),NPDisabled),
+  cast=Tab("Player cast overlay",AssignOrder({c=C("playerCastOverlayColor","Player cast overlay color"),l=R("playerCastOverlayFrameLevel","Player cast overlay frame level",1,100,1),e=T("playerCastOverlaySparkEnabled","Enable player cast overlay spark"),t=S("playerCastOverlaySparkTextureKey","Spark texture",GetStatusBarTextureOptions,nil,true),sc=C("playerCastOverlaySparkColor","Spark color"),w=R("playerCastOverlaySparkWidth","Spark width",1,12,1)}),NPDisabled),
+  ratio=Tab("HP ratio overlay",AssignOrder({g=T("hpRatioOnlyGreaterThanPlayer","Show HP ratio only when unit max HP is greater than player max HP"),s=R("hpRatioFontSize","HP ratio font size",6,24,1),y=R("hpRatioYOffset","HP ratio Y offset",-40,40,1),l=R("hpRatioFrameLevel","HP ratio frame level",1,100,1),f=S("hpRatioFontKey","HP ratio font",GetFontOptions),o=S("hpRatioFontOutlineKey","HP ratio font outline",FONT_OUTLINE_OPTIONS),c=C("hpRatioColor","HP ratio font color")}),NPDisabled),
+  level=Tab("Unit level overlay",AssignOrder({x=R("levelOverlayXOffset","Level X offset",-160,160,1),y=R("levelOverlayYOffset","Level Y offset",-80,80,1),s=R("levelOverlayFontSize","Level font size",6,32,1),f=S("levelOverlayFontKey","Level font",GetFontOptions),o=S("levelOverlayFontOutlineKey","Level font outline",FONT_OUTLINE_OPTIONS),a=S("levelOverlayAlign","Level align / growth",LEVEL_OVERLAY_ALIGN_OPTIONS),c=C("levelOverlayColor","Level color"),l=R("levelOverlayFrameLevel","Level overlay frame level",1,100,1)}),NPDisabled),
+  marker=Tab("HP threshold marker",AssignOrder({b=T("hpMarkerUseBorderColor","Use current nameplate border color"),e=T("hpMarkerOnlyEnemy","Only show on enemy units"),p=R("hpMarkerPercent","Marker position percent",0,100,1),m=S("hpMarkerWidthMode","Marker width mode",HP_MARKER_WIDTH_MODE_OPTIONS),w=R("hpMarkerWidth","Fixed line width",1,20,1),l=R("hpMarkerFrameLevel","Marker frame level",1,100,1)}),NPDisabled),
  }
+ tabs.names.order=1;tabs.cast.order=2;tabs.ratio.order=3;tabs.level.order=4;tabs.marker.order=5
+ return{settings=InlineTabs("Overlays",tabs,NPDisabled)}
 end
 local function Auras(buff)
  local p= buff and "buff" or "debuff";local P=buff and "Buff" or "Debuff";local anchor=buff and BUFF_ANCHOR_OPTIONS or DEBUFF_ANCHOR_OPTIONS
@@ -333,6 +360,16 @@ local function Options()
  }}
 end
 function S2KEnhancementsConfigControlBound(control, appName, path)
+ if control then control.s2kBorderColorPrefix=nil end
+ if appName==APP and control and path then
+  for i=1,#path do
+   local segment=path[i]
+   if segment=='target' or segment=='focus' or segment=='friendly' or segment=='enemy' then
+    control.s2kBorderColorPrefix=segment
+    break
+   end
+  end
+ end
  if appName==APP and path and path[#path]=="preview" and path[#path-1]=="nameplates" then
   previewToggleControl=control
  elseif appName==APP and path and path[#path]=="status" and path[#path-1]=="dominos" and path[#path-2]=="addons" then
@@ -378,7 +415,7 @@ function SyncDominosOptionsControls()
  end
 end
 local function ValidateS2KAceGUIWidgets()
- local required={"S2KFrame","S2KCheckBox","S2KColorPicker","S2KSlider","S2KTextDropdown","S2KTextureDropdown","S2KBorderDropdown","S2KDropdown-Item-StatusBar"}
+ local required={"S2KFrame","S2KInlineTabGroup","S2KStatsPanel","S2KTextViewerWindow","S2KCheckBox","S2KColorPicker","S2KSlider","S2KTextDropdown","S2KTextureDropdown","S2KBorderDropdown","S2KDropdown-Item-StatusBar"}
  for _,widgetType in ipairs(required) do
   if not GUI:GetWidgetVersion(widgetType) then return false,widgetType end
  end
@@ -400,51 +437,6 @@ function BuildOptionsPanel()
  local w,h=GetSavedWindowSize();ACD:SetDefaultSize(APP,math.max(760,w or 900),math.max(560,h or 700))
  built=true;return true
 end
-local function AnchorWindowToCurrentTop(frame)
- local left,top=frame:GetLeft(),frame:GetTop()
- if not left or not top then return end
- local frameScale=frame.GetEffectiveScale and frame:GetEffectiveScale()or 1
- local parentScale=UIParent.GetEffectiveScale and UIParent:GetEffectiveScale()or 1
- left=left*frameScale/parentScale
- top=top*frameScale/parentScale
- frame:ClearAllPoints()
- frame:SetPoint("TOPLEFT",UIParent,"BOTTOMLEFT",left,top)
-end
-local function SetConfigWindowCollapsed(widget,collapsed)
- local frame=widget and widget.frame
- if not frame then return end
- collapsed=collapsed and true or false
- State.configWindowCollapsed=collapsed
- if DBRoot then DBRoot.configWindowCollapsed=collapsed end
- AnchorWindowToCurrentTop(frame)
- if collapsed then
-  State.configExpandedHeight=math.max(560,frame:GetHeight() or 700)
-  if widget.content then widget.content:Hide() end
-  if widget.sizer_e then widget.sizer_e:Hide() end
-  if widget.sizer_s then widget.sizer_s:Hide() end
-  if widget.sizer_se then widget.sizer_se:Hide() end
-  frame:SetMinResize(400,54)
-  frame:SetMaxResize(1600,1600)
-  frame:SetHeight(54)
- else
-  if widget.content then widget.content:Show() end
-  if widget.sizer_e then widget.sizer_e:Show() end
-  if widget.sizer_s then widget.sizer_s:Show() end
-  if widget.sizer_se then widget.sizer_se:Show() end
-  frame:SetMinResize(650,300)
-  frame:SetMaxResize(1600,1600)
-  frame:SetHeight(State.configExpandedHeight or (DBRoot and DBRoot.configWindowHeight) or 700)
-  if widget.DoLayout then widget:DoLayout() end
- end
- if State.configCollapseButton then
-  local direction=collapsed and "Down"or"Up"
-  State.configCollapseButton:SetNormalTexture("Interface\\Buttons\\UI-ScrollBar-Scroll"..direction.."Button-Up")
-  State.configCollapseButton:SetPushedTexture("Interface\\Buttons\\UI-ScrollBar-Scroll"..direction.."Button-Down")
-  State.configCollapseButton:SetDisabledTexture("Interface\\Buttons\\UI-ScrollBar-Scroll"..direction.."Button-Disabled")
-  State.configCollapseButton:SetHighlightTexture("Interface\\Buttons\\UI-ScrollBar-Scroll"..direction.."Button-Highlight")
- end
-end
-
 local function HookWindow()
  local widget=ACD and ACD.OpenFrames[APP];if not widget then return end
  State.aceConfigWidget=widget;State.configFrame=widget.frame or widget
@@ -454,30 +446,15 @@ local function HookWindow()
   widget.content:SetPoint("BOTTOMRIGHT",State.configFrame,"BOTTOMRIGHT",-12,13)
  end
  if hooked==State.configFrame or not State.configFrame then return end;hooked=State.configFrame
- State.configFrame:SetMinResize(650,300)
- State.configFrame:SetMaxResize(1600,1600)
- local close=CreateFrame("Button",nil,State.configFrame)
- close:SetSize(32,32)
- close:SetPoint("TOPRIGHT",State.configFrame,"TOPRIGHT",-8,-8)
- close:SetFrameLevel(State.configFrame:GetFrameLevel()+60)
- close:RegisterForClicks("LeftButtonUp")
- close:SetNormalTexture("Interface\\Buttons\\UI-Panel-MinimizeButton-Up")
- close:SetPushedTexture("Interface\\Buttons\\UI-Panel-MinimizeButton-Down")
- close:SetHighlightTexture("Interface\\Buttons\\UI-Panel-MinimizeButton-Highlight")
- close:SetHitRectInsets(0,0,0,0)
- close:SetScript("OnClick",function()CloseS2KConfig()end)
- State.configHeaderCloseButton=close
- local collapse=CreateFrame("Button",nil,State.configFrame)
- collapse:SetSize(32,32)
- collapse:SetPoint("RIGHT",close,"LEFT",-4,0)
- collapse:SetFrameLevel(State.configFrame:GetFrameLevel()+60)
- collapse:RegisterForClicks("LeftButtonUp")
- collapse:SetHitRectInsets(0,0,0,0)
- collapse:SetScript("OnClick",function()SetConfigWindowCollapsed(widget,not State.configWindowCollapsed)end)
- collapse:SetScript("OnEnter",function(self)GameTooltip:SetOwner(self,"ANCHOR_RIGHT");GameTooltip:SetText(S2K_L(State.configWindowCollapsed and "Expand window" or "Collapse window"));GameTooltip:Show()end)
- collapse:SetScript("OnLeave",function()GameTooltip:Hide()end)
- State.configCollapseButton=collapse
- SetConfigWindowCollapsed(widget,DBRoot and DBRoot.configWindowCollapsed)
+ widget:SetResizeBounds(650,300,1600,1600)
+ widget:SetHeaderButtons(true,true)
+ widget:SetCollapseTooltip(function(collapsed)return S2K_L(collapsed and "Expand window" or "Collapse window")end)
+ widget:SetCallback("OnCloseButton",function()CloseS2KConfig()end)
+ widget:SetCallback("OnCollapseChanged",function(_,_,collapsed)
+  State.configWindowCollapsed=collapsed
+  if DBRoot then DBRoot.configWindowCollapsed=collapsed end
+ end)
+ widget:SetCollapsed(DBRoot and DBRoot.configWindowCollapsed)
  State.configFrame:HookScript("OnHide",function()if HideNameplatePreview then HideNameplatePreview()end end)
  State.configFrame:HookScript("OnSizeChanged",function(_,w,h)if DBRoot and not State.configWindowCollapsed then DBRoot.configWindowWidth=w;DBRoot.configWindowHeight=h end end)
 end

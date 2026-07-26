@@ -6,9 +6,6 @@
 CVAR_OPTION_DEFS = {
     nameplateGlobalScale       = { cvar = "nameplateGlobalScale",       default = 1.00,  min = 0.50, max = 2.00, step = 0.05 },
     nameplateSelectedScale     = { cvar = "nameplateSelectedScale",     default = 1.00,  min = 0.50, max = 2.50, step = 0.05 },
-    nameplateLargeBottomInset  = { cvar = "nameplateLargeBottomInset",  default = 0.15,  min = 0.00, max = 1.00, step = 0.01 },
-    nameplateLargerScale       = { cvar = "nameplateLargerScale",       default = 1.20,  min = 0.50, max = 2.50, step = 0.05 },
-    nameplateLargeTopInset     = { cvar = "nameplateLargeTopInset",     default = 0.15,  min = 0.00, max = 1.00, step = 0.01 },
     nameplateMaxDistance       = { cvar = "nameplateMaxDistance",       default = 60.00, min = 0.00,  max = 60.00,  step = 1.00 },
     nameplateMotion            = { cvar = "nameplateMotion",            default = 0,     min = 0,    max = 2,    step = 1, integer = true },
     nameplateMotionSpeed       = { cvar = "nameplateMotionSpeed",       default = 0.025, min = 0.00, max = 1.00, step = 0.005 },
@@ -31,12 +28,12 @@ NAMEPLATE_BOOLEAN_CVAR_DEFS = {
 
 NAMEPLATE_CVAR_KEYS_BY_NAME = {}
 for key, def in pairs(CVAR_OPTION_DEFS) do
-    NAMEPLATE_CVAR_KEYS_BY_NAME[tostring(def.cvar):lower()] = { key = key, numeric = true }
+    NAMEPLATE_CVAR_KEYS_BY_NAME[tostring(def.cvar):lower()] = { key = key, cvar = def.cvar, numeric = true }
 end
 for key, def in pairs(NAMEPLATE_BOOLEAN_CVAR_DEFS) do
-    NAMEPLATE_CVAR_KEYS_BY_NAME[tostring(def.cvar):lower()] = { key = key, boolean = true }
+    NAMEPLATE_CVAR_KEYS_BY_NAME[tostring(def.cvar):lower()] = { key = key, cvar = def.cvar, boolean = true }
 end
-NAMEPLATE_CVAR_KEYS_BY_NAME.nameplateotheratbase = { key = "nameplateAtBase", atBase = true }
+NAMEPLATE_CVAR_KEYS_BY_NAME.nameplateotheratbase = { key = "nameplateAtBase", cvar = "nameplateOtherAtBase", atBase = true }
 
 function GetNumericCVar(cvarName, fallback)
     if not GetCVar or not cvarName then
@@ -200,6 +197,70 @@ function CopyDefaults()
         DB.unifiedHealthbarSizeV1Migrated = true
     end
 
+    if not DB.nameplateGroupsV1Migrated then
+        local function CopySetting(targetKey, sourceKey, fallback)
+            local value = DB[sourceKey]
+            if value == nil then value = DEFAULTS[sourceKey] end
+            if value == nil then value = fallback end
+            DB[targetKey] = CopySavedValue(value)
+        end
+
+        for _, group in ipairs(NAMEPLATE_DIMENSION_GROUPS) do
+            CopySetting(group .. "PlateWidth", "plateWidth", 110)
+            CopySetting(group .. "PlateHeight", "plateHeight", 12)
+            CopySetting(group .. "NameplateHitboxWidth", "nameplateHitboxWidth", 110)
+            CopySetting(group .. "NameplateHitboxHeight", "nameplateHitboxHeight", 45)
+            CopySetting(group .. "HealthbarHitboxXOffset", "healthbarHitboxXOffset", 0)
+            CopySetting(group .. "HealthbarHitboxYOffset", "healthbarHitboxYOffset", 0)
+            CopySetting(group .. "HealthbarFrameStrata", "healthbarFrameStrata", "HIGH")
+        end
+
+        local suffixes = {
+            "HealthTextureKey", "HealthTexturePath", "HealthUseReactionColor",
+            "HealthColorR", "HealthColorG", "HealthColorB", "HealthColorA",
+            "HealthBackdropTextureKey", "HealthBackdropTexturePath",
+            "HealthBackdropColorR", "HealthBackdropColorG", "HealthBackdropColorB", "HealthBackdropColorA",
+            "BorderTextureKey", "BorderTexturePath", "BorderSize", "BorderInset", "BorderOffset",
+            "BorderColorR", "BorderColorG", "BorderColorB", "BorderColorA",
+        }
+        local general = {
+            HealthTextureKey="healthTextureKey", HealthTexturePath="healthTexturePath", HealthUseReactionColor="healthUseReactionColor",
+            HealthColorR="healthColorR", HealthColorG="healthColorG", HealthColorB="healthColorB", HealthColorA="healthColorA",
+            HealthBackdropTextureKey="healthBackdropTextureKey", HealthBackdropTexturePath="healthBackdropTexturePath",
+            HealthBackdropColorR="healthBackdropColorR", HealthBackdropColorG="healthBackdropColorG", HealthBackdropColorB="healthBackdropColorB", HealthBackdropColorA="healthBackdropColorA",
+            BorderTextureKey="borderTextureKey", BorderTexturePath="borderTexturePath", BorderSize="borderSize", BorderInset="borderInset", BorderOffset="borderOffset",
+            BorderColorR="borderColorR", BorderColorG="borderColorG", BorderColorB="borderColorB", BorderColorA="borderColorA",
+        }
+        local target = {
+            HealthTextureKey="targetHealthTextureKey", HealthTexturePath="targetHealthTexturePath", HealthUseReactionColor="targetHealthUseReactionColor",
+            HealthColorR="targetHealthColorR", HealthColorG="targetHealthColorG", HealthColorB="targetHealthColorB", HealthColorA="targetHealthColorA",
+            HealthBackdropTextureKey="targetHealthBackdropTextureKey", HealthBackdropTexturePath="targetHealthBackdropTexturePath",
+            HealthBackdropColorR="targetHealthBackdropColorR", HealthBackdropColorG="targetHealthBackdropColorG", HealthBackdropColorB="targetHealthBackdropColorB", HealthBackdropColorA="targetHealthBackdropColorA",
+            BorderTextureKey="targetBorderTextureKey", BorderTexturePath="targetBorderTexturePath", BorderSize="targetBorderSize", BorderInset="targetBorderInset", BorderOffset="targetBorderOffset",
+            BorderColorR="targetBorderColorR", BorderColorG="targetBorderColorG", BorderColorB="targetBorderColorB", BorderColorA="targetBorderColorA",
+        }
+        for _, group in ipairs({ "friendly", "enemy" }) do
+            for _, suffix in ipairs(suffixes) do CopySetting(group .. suffix, general[suffix]) end
+        end
+        local targetSource = DB.targetHealthbarOverride and target or general
+        for _, suffix in ipairs(suffixes) do
+            CopySetting("target" .. suffix, targetSource[suffix])
+            CopySetting("focus" .. suffix, targetSource[suffix])
+        end
+        for _, group in ipairs(NAMEPLATE_DESIGN_GROUPS) do
+            CopySetting(group .. "ShowNames", "showNames", false)
+            CopySetting(group .. "ShowHPRatio", "hpRatioText", true)
+            CopySetting(group .. "ShowLevelOverlay", "levelOverlayEnabled", false)
+            CopySetting(group .. "ShowHPMarker", "hpMarkerEnabled", false)
+            CopySetting(group .. "HPMarkerColorR", "hpMarkerColorR", 1)
+            CopySetting(group .. "HPMarkerColorG", "hpMarkerColorG", 1)
+            CopySetting(group .. "HPMarkerColorB", "hpMarkerColorB", 1)
+            CopySetting(group .. "HPMarkerColorA", "hpMarkerColorA", 1)
+        end
+        CopySetting("targetPlayerCastOverlayEnabled", "playerCastOverlayEnabled", true)
+        DB.nameplateGroupsV1Migrated = true
+    end
+
     -- Rebuild CFG from the active profile every time. Do not leave stale values
     -- from the previously active profile in memory. This matters when older
     -- profiles do not contain a key that newer builds added later.
@@ -215,8 +276,6 @@ function CopyDefaults()
                 DB[k] = GetNumericCVar(cvarDef.cvar, cvarDef.default or v)
             elseif booleanCVarDef then
                 DB[k] = GetBooleanCVar(booleanCVarDef.cvar, booleanCVarDef.default)
-            elseif k == "largeNameplates" then
-                DB[k] = GetNumericCVar("NamePlateVerticalScale", 1) > 1.001
             else
                 DB[k] = CopySavedValue(v)
             end
@@ -496,7 +555,6 @@ function ResetNameplateCVarSettingsToDefaults()
     for key, def in pairs(CVAR_OPTION_DEFS) do
         SetNum(key, def.default or DEFAULTS[key] or 0)
     end
-    SetBool("largeNameplates", DEFAULTS.largeNameplates and true or false)
     for key, def in pairs(NAMEPLATE_BOOLEAN_CVAR_DEFS) do
         SetBool(key, def.default and true or false)
     end

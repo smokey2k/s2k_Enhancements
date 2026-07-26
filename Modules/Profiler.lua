@@ -269,34 +269,14 @@ function EnsureWeakAuraAnchorStatsPanel()
         return State.weakAuraAnchorStatsPanel
     end
 
-    local panel = CreateFrame("Frame", "s2k_WeakAuraAnchorStatsPanel", UIParent)
+    local widget = LibStub("AceGUI-3.0"):Create("S2KStatsPanel")
+    local panel = widget.frame
     panel:SetSize(260, 138)
     panel:SetPoint("CENTER", UIParent, "CENTER", 0, 160)
     panel:SetFrameStrata("DIALOG")
     panel:SetFrameLevel(950)
-    panel:EnableMouse(true)
-    panel:SetMovable(true)
-    panel:RegisterForDrag("LeftButton")
-    panel:SetScript("OnDragStart", function(self) self:StartMoving() end)
-    panel:SetScript("OnDragStop", function(self) self:StopMovingOrSizing() end)
-
-    local bg = panel:CreateTexture(nil, "BACKGROUND")
-    bg:SetAllPoints(panel)
-    bg:SetColorTexture(0, 0, 0, 0.78)
-
-    local title = panel:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
-    title:SetPoint("TOPLEFT", panel, "TOPLEFT", 8, -8)
-    title:SetText("WA anchor engine")
-    panel.title = title
-
-    panel.lines = {}
-    for i = 1, 7 do
-        local line = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-        line:SetPoint("TOPLEFT", panel, "TOPLEFT", 8, -8 - (i * 16))
-        line:SetJustifyH("LEFT")
-        line:SetText("")
-        panel.lines[i] = line
-    end
+    widget:SetMovable(true); widget:SetTitle("WA anchor engine"); widget:SetLineCount(7)
+    panel.title, panel.lines, panel.s2kWidget = widget.title, widget.lines, widget
 
     panel:Hide()
     State.weakAuraAnchorStatsPanel = panel
@@ -343,33 +323,60 @@ function UpdateWeakAuraAnchorStatsPanel(elapsed)
     local ups = elapsedSec > 0 and (calls / elapsedSec) or 0
     local deltaAvg = (stats.deltaCount or 0) > 0 and ((stats.deltaTotal or 0) / (stats.deltaCount or 1)) or 0
 
-    panel.title:SetText("WA anchor engine: " .. tostring(stats.engine or GetWeakAuraAnchorEngine()))
-    panel.lines[1]:SetText(string.format("mode=%s  unit=%s", tostring(stats.mode or "none"), tostring(stats.unit or "")))
-    panel.lines[2]:SetText(string.format("updates/sec=%.1f  calls=%d", ups, calls))
-    panel.lines[3]:SetText(string.format("cpu avg=%.4f ms  max=%.4f ms", avg, stats.max or 0))
-    panel.lines[4]:SetText(string.format("delta avg=%.2f ms  max=%.2f ms", deltaAvg, stats.deltaMax or 0))
-    panel.lines[5]:SetText(string.format("ok=%d  fail=%d", stats.ok or 0, stats.fail or 0))
-    panel.lines[6]:SetText(string.format("relinks=%d  fallbacks=%d", stats.relinks or 0, stats.fallbacks or 0))
-    panel.lines[7]:SetText("drag to move")
+    local widget=panel.s2kWidget
+    widget:SetTitle("WA anchor engine: " .. tostring(stats.engine or GetWeakAuraAnchorEngine()))
+    widget:SetLine(1,string.format("mode=%s  unit=%s", tostring(stats.mode or "none"), tostring(stats.unit or "")))
+    widget:SetLine(2,string.format("updates/sec=%.1f  calls=%d", ups, calls))
+    widget:SetLine(3,string.format("cpu avg=%.4f ms  max=%.4f ms", avg, stats.max or 0))
+    widget:SetLine(4,string.format("delta avg=%.2f ms  max=%.2f ms", deltaAvg, stats.deltaMax or 0))
+    widget:SetLine(5,string.format("ok=%d  fail=%d", stats.ok or 0, stats.fail or 0))
+    widget:SetLine(6,string.format("relinks=%d  fallbacks=%d", stats.relinks or 0, stats.fallbacks or 0))
+    widget:SetLine(7,"drag to move")
 end
 function ProfilerPrintHelp()
     print("---- s2k:Enhancements commands ----")
-    print("/s2ke               - open or close configuration")
-    print("/s2ke config        - open configuration")
-    print("/s2ke help          - show this command list")
-    print("/s2ke dominos       - toggle Dominos / Editable layout mode")
-    print("/s2ke ?             - show this command list")
-    print("/s2ke prof on       - enable internal profiler and reset data")
-    print("/s2ke prof off      - disable internal profiler")
-    print("/s2ke prof reset    - reset collected profiler data")
-    print("/s2ke prof print    - print profiler report")
-    print("/s2ke prof          - same as /s2ke prof print")
-    print("/s2ke cpu           - print WoW AddOnCPUUsage total")
-    print("/s2ke wastats on    - show WA anchor stats panel")
-    print("/s2ke wastats off   - hide WA anchor stats panel")
-    print("/s2ke bench 60      - 60 sec WoW CPU benchmark, profiler OFF")
-    print("/s2ke benchprof 60  - 60 sec benchmark plus internal function profiler")
-    print("Aliases: profile on/off/reset/print also work.")
+    print("Configuration:")
+    print("  /s2ke                         - open or close configuration")
+    print("  /s2ke config                  - open configuration")
+    print("  /s2ke help                    - show this complete command list")
+    print("  /clear or /cls                - clear the selected chat window")
+    print("  /s2ke dominos                 - toggle Dominos / Editable layout mode")
+    print("Profiles:")
+    print("  /s2keprof list                - list profiles and the current profile")
+    print("  /s2keprof load NAME           - switch to a profile")
+    print("  /s2keprof save NAME           - save the current settings as a profile")
+    print("  /s2keprof save-switch NAME    - save and switch to the new profile")
+    print("  /s2keprof copyfrom NAME       - copy another profile into the current one")
+    print("Modules:")
+    print("  /s2kemod list                 - list modules and their current states")
+    print("  /s2kemod on NAME              - enable a module")
+    print("  /s2kemod off NAME             - disable a module")
+    print("Diagnostics:")
+    print("  /s2ke prof on|off             - enable or disable the internal profiler")
+    print("  /s2ke prof reset|print        - reset or print profiler data")
+    print("  /s2ke cpu                     - print WoW AddOnCPUUsage total")
+    print("  /s2ke wastats on|off|reset    - control WA anchor statistics")
+    print("  /s2ke bench [SECONDS]         - CPU benchmark with profiler disabled")
+    print("  /s2ke benchprof [SECONDS]     - CPU benchmark with profiler enabled")
+    print("Aliases:")
+    print("  /s2knp, /s2knpprof, /s2knpmod; config/options/settings; help/?/commands")
+    print("  profile = prof; usage = cpu; enable/disable = on/off")
+end
+
+function ClearSelectedChatWindow()
+    local frame = SELECTED_CHAT_FRAME or DEFAULT_CHAT_FRAME or ChatFrame1
+    if frame and type(frame.Clear) == "function" then
+        frame:Clear()
+        return true
+    end
+    print("s2k:Enhancements: the selected chat window cannot be cleared.")
+    return false
+end
+
+SLASH_S2KCLEARCHAT1 = "/clear"
+SLASH_S2KCLEARCHAT2 = "/cls"
+SlashCmdList["S2KCLEARCHAT"] = function()
+    ClearSelectedChatWindow()
 end
 
 SLASH_S2KNAMEPLATES1 = "/s2ke"

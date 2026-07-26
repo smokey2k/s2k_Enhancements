@@ -1,7 +1,7 @@
 --[[-----------------------------------------------------------------------------
 S2K Frame Container
 -------------------------------------------------------------------------------]]
-local Type, Version = "S2KFrame", 1
+local Type, Version = "S2KFrame", 2
 local AceGUI = LibStub and LibStub("AceGUI-3.0", true)
 if not AceGUI then return end
 
@@ -24,6 +24,23 @@ end
 
 local function Frame_OnClose(frame)
 	frame.obj:Fire("OnClose")
+end
+
+local function Close_OnClick(button)
+	button.obj:Fire("OnCloseButton")
+	if button.obj.frame:IsShown() then button.obj.frame:Hide() end
+end
+
+local function Collapse_OnClick(button)
+	local self = button.obj
+	self:SetCollapsed(not self.collapsed)
+	self:Fire("OnCollapseChanged", self.collapsed)
+end
+
+local function Collapse_OnEnter(button)
+	local self=button.obj
+	if not self.collapseTooltip then return end
+	GameTooltip:SetOwner(button,"ANCHOR_RIGHT");GameTooltip:SetText(self.collapseTooltip(self.collapsed));GameTooltip:Show()
 end
 
 local function Frame_OnMouseDown(frame)
@@ -71,11 +88,15 @@ local methods = {
 		self:SetTitle()
 		self:SetStatusText()
 		self:ApplyStatus()
+		self:SetHeaderButtons(true, false)
+		self:SetCollapsed(false, true)
+		self:EnableResize(true)
 		self:Show()
-        self:EnableResize(true)
 	end,
 
 	["OnRelease"] = function(self)
+		self.expandedHeight, self.collapsed = nil, nil
+		self.collapseTooltip = nil
 		self.status = nil
 		wipe(self.localstatus)
 	end,
@@ -116,10 +137,50 @@ local methods = {
 	end,
 
 	["EnableResize"] = function(self, state)
+		self.resizeEnabled = state and true or false
+		if self.collapsed then state = false end
 		local func = state and "Show" or "Hide"
 		self.sizer_se[func](self.sizer_se)
 		self.sizer_s[func](self.sizer_s)
 		self.sizer_e[func](self.sizer_e)
+	end,
+
+	["SetHeaderButtons"] = function(self, showClose, showCollapse)
+		if showClose == false then self.closebutton:Hide() else self.closebutton:Show() end
+		if showCollapse then self.collapsebutton:Show() else self.collapsebutton:Hide() end
+	end,
+
+	["SetCollapseTooltip"] = function(self, callback) self.collapseTooltip=callback end,
+
+	["SetCollapsed"] = function(self, collapsed, suppressLayout)
+		collapsed = collapsed and true or false
+		local frame, left, top = self.frame, self.frame:GetLeft(), self.frame:GetTop()
+		if left and top then
+			local fs = frame.GetEffectiveScale and frame:GetEffectiveScale() or 1
+			local ps = UIParent.GetEffectiveScale and UIParent:GetEffectiveScale() or 1
+			frame:ClearAllPoints(); frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", left * fs / ps, top * fs / ps)
+		end
+		self.collapsed = collapsed
+		if collapsed then
+			self.expandedHeight = math.max(200, frame:GetHeight() or 500)
+			self.content:Hide(); frame:SetMinResize(400, 54); frame:SetHeight(54)
+		else
+			self.content:Show(); frame:SetMinResize(self.minWidth or 400, self.minHeight or 200)
+			frame:SetHeight(self.expandedHeight or frame:GetHeight() or 500)
+			if self.DoLayout and not suppressLayout then self:DoLayout() end
+		end
+		self:EnableResize(self.resizeEnabled ~= false)
+		local direction = collapsed and "Down" or "Up"
+		self.collapsebutton:SetNormalTexture("Interface\\Buttons\\UI-ScrollBar-Scroll"..direction.."Button-Up")
+		self.collapsebutton:SetPushedTexture("Interface\\Buttons\\UI-ScrollBar-Scroll"..direction.."Button-Down")
+		self.collapsebutton:SetDisabledTexture("Interface\\Buttons\\UI-ScrollBar-Scroll"..direction.."Button-Disabled")
+		self.collapsebutton:SetHighlightTexture("Interface\\Buttons\\UI-ScrollBar-Scroll"..direction.."Button-Highlight")
+	end,
+
+	["SetResizeBounds"] = function(self, minWidth, minHeight, maxWidth, maxHeight)
+		self.minWidth, self.minHeight = minWidth, minHeight
+		self.frame:SetMinResize(minWidth, minHeight)
+		if maxWidth and maxHeight then self.frame:SetMaxResize(maxWidth, maxHeight) end
 	end,
 
 	-- called to set an external table to store status in
@@ -199,6 +260,20 @@ local function Constructor()
 	titlebg_r:SetWidth(30)
 	titlebg_r:SetHeight(40)
 
+	local closebutton = CreateFrame("Button", nil, frame)
+	closebutton:SetSize(32, 32); closebutton:SetPoint("TOPRIGHT", -8, -8)
+	closebutton:SetFrameLevel(frame:GetFrameLevel() + 60); closebutton:RegisterForClicks("LeftButtonUp")
+	closebutton:SetNormalTexture("Interface\\Buttons\\UI-Panel-MinimizeButton-Up")
+	closebutton:SetPushedTexture("Interface\\Buttons\\UI-Panel-MinimizeButton-Down")
+	closebutton:SetHighlightTexture("Interface\\Buttons\\UI-Panel-MinimizeButton-Highlight")
+	closebutton:SetScript("OnClick", Close_OnClick)
+	local collapsebutton = CreateFrame("Button", nil, frame)
+	collapsebutton:SetSize(32, 32); collapsebutton:SetPoint("RIGHT", closebutton, "LEFT", -4, 0)
+	collapsebutton:SetFrameLevel(frame:GetFrameLevel() + 60); collapsebutton:RegisterForClicks("LeftButtonUp")
+	collapsebutton:SetScript("OnClick", Collapse_OnClick)
+	collapsebutton:SetScript("OnEnter", Collapse_OnEnter)
+	collapsebutton:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
 	local sizer_se = CreateFrame("Frame", nil, frame)
 	sizer_se:SetPoint("BOTTOMRIGHT")
 	sizer_se:SetWidth(30)
@@ -252,6 +327,8 @@ local function Constructor()
 		titletext   = titletext,
 		titlebg     = titlebg,
 		title       = title,
+		closebutton = closebutton,
+		collapsebutton = collapsebutton,
 		sizer_se    = sizer_se,
 		sizer_s     = sizer_s,
 		sizer_e     = sizer_e,
@@ -262,7 +339,78 @@ local function Constructor()
 	for method, func in pairs(methods) do
 		widget[method] = func
 	end
+	closebutton.obj, collapsebutton.obj = widget, widget
 	return AceGUI:RegisterAsContainer(widget)
 end
 
 AceGUI:RegisterWidgetType(Type, Constructor, Version)
+do
+local Type, Version = "S2KInlineTabGroup", 1
+local AceGUI = LibStub and LibStub("AceGUI-3.0", true)
+if not AceGUI or (AceGUI:GetWidgetVersion(Type) or 0) >= Version then return end
+local function Constructor()
+ local base=AceGUI.WidgetRegistry and AceGUI.WidgetRegistry.TabGroup
+ if not base then error("S2KInlineTabGroup requires AceGUI TabGroup") end
+ local widget=base(); widget.type=Type
+ local acquire=widget.OnAcquire
+ widget.OnAcquire=function(self)
+  if acquire then acquire(self) end
+  self:SetUserData("s2kInlineTabNaturalHeight",true)
+ end
+ return widget
+end
+AceGUI:RegisterWidgetType(Type,Constructor,Version)
+end
+
+do
+local Type, Version = "S2KStatsPanel", 1
+local AceGUI = LibStub and LibStub("AceGUI-3.0", true)
+if not AceGUI or (AceGUI:GetWidgetVersion(Type) or 0) >= Version then return end
+local methods = {
+ OnAcquire=function(self) self:SetTitle(""); self:SetLineCount(0); self.frame:Show() end,
+ OnRelease=function(self) self.frame:Hide(); self:SetLineCount(0) end,
+ SetTitle=function(self,text) self.title:SetText(text or "") end,
+ SetLineCount=function(self,count)
+  count=math.max(0,tonumber(count) or 0)
+  for i=1,count do local line=self.lines[i]; if not line then line=self.frame:CreateFontString(nil,"ARTWORK","GameFontHighlightSmall"); line:SetPoint("TOPLEFT",8,-8-(i*16)); line:SetJustifyH("LEFT"); self.lines[i]=line end; line:Show() end
+  for i=count+1,#self.lines do self.lines[i]:SetText(""); self.lines[i]:Hide() end
+  self.lineCount=count
+ end,
+ SetLine=function(self,index,text) if index>(self.lineCount or 0) then self:SetLineCount(index) end; self.lines[index]:SetText(text or "") end,
+ SetMovable=function(self,movable) self.frame:SetMovable(movable); self.frame:EnableMouse(movable); if movable then self.frame:RegisterForDrag("LeftButton") end end,
+}
+local function Constructor()
+ local frame=CreateFrame("Frame",nil,UIParent); frame:SetSize(260,138); frame:SetFrameStrata("DIALOG"); frame:SetFrameLevel(950)
+ local bg=frame:CreateTexture(nil,"BACKGROUND"); bg:SetAllPoints(); bg:SetColorTexture(0,0,0,0.78)
+ local title=frame:CreateFontString(nil,"ARTWORK","GameFontNormalSmall"); title:SetPoint("TOPLEFT",8,-8)
+ local widget={type=Type,frame=frame,title=title,lines={}}; for name,method in pairs(methods) do widget[name]=method end
+ frame.obj=widget; frame:SetScript("OnDragStart",function(self)self:StartMoving()end); frame:SetScript("OnDragStop",function(self)self:StopMovingOrSizing()end)
+ return AceGUI:RegisterAsWidget(widget)
+end
+AceGUI:RegisterWidgetType(Type,Constructor,Version)
+end
+
+do
+local Type,Version="S2KTextViewerWindow",1
+local AceGUI=LibStub and LibStub("AceGUI-3.0",true); if not AceGUI or (AceGUI:GetWidgetVersion(Type)or 0)>=Version then return end
+local function Update(self) local w=math.max(100,self.scroll:GetWidth()-24);self.editBox:SetWidth(w);self.measure:SetWidth(w-8);self.measure:SetText(self.editBox:GetText()or"");self.editBox:SetHeight(math.max(self.scroll:GetHeight(),self.measure:GetStringHeight()+24))end
+local function StopSelection(self) self.s2kSelecting=nil;self.s2kScrollElapsed=0;self:SetScript("OnUpdate",nil) end
+local function SelectionUpdate(self,elapsed)
+ if not self.s2kSelecting or not IsMouseButtonDown("LeftButton") then StopSelection(self);return end
+ self.s2kScrollElapsed=(self.s2kScrollElapsed or 0)+elapsed;if self.s2kScrollElapsed<.03 then return end;self.s2kScrollElapsed=0
+ local widget=self.s2kViewer;local _,y=GetCursorPosition();y=y/UIParent:GetEffectiveScale();local top,bottom=widget.scroll:GetTop(),widget.scroll:GetBottom()
+ if top and y>top-18 then widget:Scroll(-18) elseif bottom and y<bottom+18 then widget:Scroll(18) end
+end
+local methods={OnAcquire=function(self)self.frame:Show()end,OnRelease=function(self)self.frame:Hide();self:SetText("")end,SetTitle=function(self,t)self.title:SetText(t or"")end,SetText=function(self,t)self.editBox:SetText(t or"");self.editBox:SetCursorPosition(0);self.scroll:SetVerticalScroll(0);Update(self)end,Scroll=function(self,d)local s=self.scroll;s:SetVerticalScroll(math.max(0,math.min(s:GetVerticalScrollRange()or 0,(s:GetVerticalScroll()or 0)+d)));self.editBox:SetFocus()end,UpdateContent=Update}
+local function Constructor()
+ local f=CreateFrame("Frame",nil,UIParent);f:SetFrameStrata("DIALOG");f:SetClampedToScreen(true);f:SetMovable(true);f:SetResizable(true);f:SetMinResize(320,240);f:SetBackdrop({bgFile="Interface\\DialogFrame\\UI-DialogBox-Background",edgeFile="Interface\\DialogFrame\\UI-DialogBox-Border",edgeSize=24,insets={left=6,right=6,top=6,bottom=6}});f:EnableMouse(true);f:RegisterForDrag("LeftButton")
+ local title=f:CreateFontString(nil,"OVERLAY","GameFontNormalLarge");title:SetPoint("TOP",0,-14);local close=CreateFrame("Button",nil,f,"UIPanelCloseButton");close:SetPoint("TOPRIGHT",-4,-4)
+ local scroll=CreateFrame("ScrollFrame",nil,f,"UIPanelScrollFrameTemplate");scroll:SetPoint("TOPLEFT",18,-42);scroll:SetPoint("BOTTOMRIGHT",-42,48);scroll:EnableMouseWheel(true);local edit=CreateFrame("EditBox",nil,scroll);edit:SetMultiLine(true);edit:SetAutoFocus(false);edit:EnableMouse(true);edit:SetFontObject(ChatFontNormal);edit:SetTextInsets(4,4,4,4);scroll:SetScrollChild(edit)
+ local measure=f:CreateFontString(nil,"ARTWORK");measure:SetFontObject(ChatFontNormal);measure:SetJustifyH("LEFT");measure:SetJustifyV("TOP");measure:Hide();local up=CreateFrame("Button",nil,f,"UIPanelButtonTemplate");up:SetSize(88,24);up:SetPoint("BOTTOMLEFT",18,16);local down=CreateFrame("Button",nil,f,"UIPanelButtonTemplate");down:SetSize(88,24);down:SetPoint("LEFT",up,"RIGHT",8,0)
+ local resize=CreateFrame("Button",nil,f);resize:SetSize(20,20);resize:SetPoint("BOTTOMRIGHT",-8,8);resize:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up");resize:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight");resize:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
+ local w={type=Type,frame=f,title=title,scroll=scroll,editBox=edit,measure=measure,up=up,down=down};for k,v in pairs(methods)do w[k]=v end;f.obj=w;edit.s2kViewer=w
+ close:SetScript("OnClick",function()f:Hide()end);f:SetScript("OnDragStart",f.StartMoving);f:SetScript("OnDragStop",function(self)self:StopMovingOrSizing();w:Fire("OnGeometryChanged")end);f:SetScript("OnSizeChanged",function()Update(w)end);scroll:SetScript("OnMouseWheel",function(_,d)w:Scroll(d>0 and -48 or 48)end);up:SetScript("OnClick",function()w:Scroll(-96)end);down:SetScript("OnClick",function()w:Scroll(96)end);edit:SetScript("OnEscapePressed",function(self)self:ClearFocus()end);edit:SetScript("OnTextChanged",function()Update(w)end);edit:SetScript("OnMouseDown",function(self,b)if b=="LeftButton"then self.s2kSelecting=true;self.s2kScrollElapsed=0;self:SetScript("OnUpdate",SelectionUpdate)end end);edit:SetScript("OnMouseUp",StopSelection);edit:SetScript("OnHide",StopSelection);resize:SetScript("OnMouseDown",function(_,b)if b=="LeftButton"then f:StartSizing("BOTTOMRIGHT")end end);resize:SetScript("OnMouseUp",function()f:StopMovingOrSizing();w:Fire("OnGeometryChanged")end)
+ return AceGUI:RegisterAsWidget(w)
+end
+AceGUI:RegisterWidgetType(Type,Constructor,Version)
+end

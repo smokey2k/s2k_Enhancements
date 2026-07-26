@@ -105,7 +105,10 @@ function S2KNP_OnEvent(self, event, arg1)
     end
 
     if event == "CVAR_UPDATE" then
-        local changed, refreshRuntime = SyncNameplateSettingFromCVar(arg1)
+        if EnforceManagedNonNameplateCVar and EnforceManagedNonNameplateCVar(arg1) then
+            return
+        end
+        local changed, refreshRuntime = EnforceManagedNameplateCVar(arg1)
         if changed and refreshRuntime then
             if InCombatLockdown and InCombatLockdown() then
                 State.pendingNameplateCVarRuntimeRefresh = true
@@ -169,7 +172,7 @@ function S2KNP_OnEvent(self, event, arg1)
         return
     end
 
-    if event == "PLAYER_TARGET_CHANGED" then
+    if event == "PLAYER_TARGET_CHANGED" or event == "PLAYER_FOCUS_CHANGED" then
         ClearTargetContextCache()
         UpdateAll(false)
         ScheduleNameplateScaleStabilization()

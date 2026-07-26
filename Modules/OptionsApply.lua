@@ -174,6 +174,37 @@ function ApplyCameraDistanceSetting(forceClamp)
     end
     return value
 end
+
+function EnforceManagedNonNameplateCVar(cvarName)
+    local normalized = tostring(cvarName or ""):lower()
+    if normalized == "displayspellactivationoverlays" then
+        local desired = EnsureSpellActivationOverlaySetting()
+        if ReadSpellActivationOverlayCVar() ~= desired then
+            ApplySpellActivationOverlaySetting()
+        end
+        return true
+    end
+
+    if normalized == "spellqueuewindow" then
+        local desired = math.floor(math.max(0, math.min(400, tonumber(CFG.spellQueueWindow) or 400)) + 0.5)
+        local actual = GetCVar and tonumber(GetCVar("SpellQueueWindow")) or nil
+        if not actual or math.abs(actual - desired) > 0.000001 then
+            ApplySpellQueueWindowSetting()
+        end
+        return true
+    end
+
+    if normalized == "cameradistancemaxzoomfactor" then
+        local desired = math.max(1.0, math.min(2.6, tonumber(CFG.cameraDistanceMaxZoomFactor) or 2.6))
+        local actual = GetCVar and tonumber(GetCVar("cameraDistanceMaxZoomFactor")) or nil
+        if not actual or math.abs(actual - desired) > 0.001 then
+            ApplyCameraDistanceSetting(false)
+        end
+        return true
+    end
+
+    return false
+end
 function ApplyOptionsNow()
     State.pendingOptionsApply = false
     local refreshFonts = State.pendingMediaRefreshFonts and true or false

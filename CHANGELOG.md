@@ -1,3 +1,31 @@
+# s2k:Enhancements 1.32.0
+
+- Made the nameplate preview honor `nameplateMotion`: Overlapping shares one anchor, Stacking forms a hitbox/vertical-overlap-based column, and Spread uses the 2x2 horizontal/vertical collision matrix.
+- Reworked the nameplate layout preview into a live 2x2 Target/Focus/Friendly/Enemy collision matrix whose spacing follows the configured hitbox sizes and horizontal/vertical overlap factors.
+- Fixed custom widget registration when another addon such as Mapster supplies the active AceGUI 3.0 library; S2K inline tabs, Chat Copy and stats widgets now register from the guaranteed-loaded S2K widget package.
+- Unified inline tab sections as the reusable `S2KInlineTabGroup` AceGUI container.
+- Moved configuration-window header, close, collapse and resize lifecycle into `S2KFrame`.
+- Added reusable `S2KTextViewerWindow` and `S2KStatsPanel` widgets for Chat Copy and debug statistics.
+- Unified runtime and preview nameplate frame/statusbar/texture/text/aura hierarchy creation through one shared visual-tree constructor.
+- Centralized section-heading visibility across every options module: multi-section pages retain headings, single-section Buffs/Debuffs and tab pages omit redundant labels, and Healthbar's two major section headings are restored automatically.
+- Converted Castbar, Castbar border, and Spell name and icon into reusable natural-height tabs without repeating the selected tab name inside its content.
+- Generalized the natural-height inline-tab renderer into a reusable, registry-valid AceConfig opt-in mechanism and converted Overlays into ordered, automatically extensible tabs sharing one outer page scrollbar.
+- Suppressed transient option tooltips while rebuilding natural-height inline tabs, preventing the border-texture tooltip from flashing during Target-to-Focus layout changes.
+- Propagated the completed inline-tab heights to the Healthbar's single outer ScrollFrame after construction and tab changes, so resized windows clip and scroll the complete Healthbar instead of letting sections overflow.
+- Fixed the Healthbar inline-tab renderer's Lua 5.1 forward references so tab selection and tab tooltips resolve AceConfig's local callbacks instead of missing globals.
+- Split Nameplate Dimensions into Friendly and Enemy tabs and made both Healthbar tabbed sections use their natural full content height inside one outer Healthbar scrollbar, fixing clipped sections and competing inner scrollbars after window resizing.
+- Removed the Large nameplates feature and its saved defaults, UI controls, large-mode CVars, enforcement, reset and localization dependencies while leaving legacy profile keys untouched for compatibility.
+- Rebuilt Healthbar > Nameplate Design as direct Target, Focus, Friendly and Enemy tabs beneath the shared Nameplate Dimensions controls.
+- Moved Nameplates > General > Units above Dimensions and laid out its checkboxes at 320 pixels so at least two controls share a row at normal window widths while still wrapping on narrower windows.
+- Restored the `nameplateOtherAtBase` control as the localized `Nameplates at unit feet / base` checkbox under Nameplates > General > Dimensions.
+- Added an enemy-only HP threshold marker filter that also suppresses the marker on friendly Target and Focus units while preserving the four design-group enable switches.
+- Made every addon-managed CVar authoritative: later Blizzard or third-party `CVAR_UPDATE` changes are restored from the saved addon settings instead of being imported into the active profile, including all nameplate CVars, camera distance, Spell Queue Window and spell-activation overlays.
+- Added standalone `/clear` and `/cls` commands to clear the currently selected chat window, and documented them in `/s2ke help`.
+- Expanded `/s2ke help` into a complete categorized list of configuration, profile, module, diagnostic and alias commands.
+- Split custom nameplates into Target, Focus, Friendly and Enemy design groups with Target > Focus > reaction priority; Target and Focus inherit Friendly/Enemy dimensions according to the unit.
+- Added independent Friendly and Enemy healthbar/hitbox dimensions and frame strata, plus per-group healthbar, backdrop, border, overlay and HP-threshold-marker appearance controls.
+- Limited the player-cast overlay to the Target design group, migrated existing profiles without discarding legacy keys, and updated the four-plate layout preview.
+
 # s2k:Enhancements 1.30.0
 
 - Prevented the configuration content from jumping when opening or closing the nameplate preview by synchronizing its bound checkbox directly instead of rebuilding the AceConfig panel.

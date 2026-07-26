@@ -113,9 +113,6 @@ API.RegisterLocale("huHU", {
     ["Motion speed"] = "Mozgási sebesség",
     ["Horizontal overlap"] = "Vízszintes átfedés",
     ["Vertical overlap"] = "Függőleges átfedés",
-    ["Large top inset"] = "Nagy felső behúzás",
-    ["Large bottom inset"] = "Nagy alsó behúzás",
-    ["Larger scale"] = "Nagyobb méret",
     ["Other top inset"] = "Egyéb felső behúzás",
     ["Other bottom inset"] = "Egyéb alsó behúzás",
 
@@ -164,6 +161,7 @@ API.RegisterLocale("huHU", {
     ["Level overlay"] = "Szint-rátét",
     ["Unit level overlay"] = "Egységszint-rátét",
     ["HP threshold marker"] = "Életerő-küszöbjelző",
+    ["Only show on enemy units"] = "Csak ellenséges egységeken jelenjen meg",
     ["Player Cast overlay"] = "Játékos varázslásrátét",
     ["Name font size"] = "Név betűmérete",
     ["Name Y offset"] = "Név Y eltolása",

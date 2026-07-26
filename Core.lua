@@ -1,7 +1,7 @@
 -- =========================================================
 -- s2k:Enhancements (s2k Enhancements)
 -- WoW 7.3.5
--- v1.30.0
+-- v1.32.0
 -- Note: top-level helper functions are intentionally non-local to stay under the Lua 5.1 chunk-local limit.
 --
 -- Custom Blizzard-nameplate driven skin system.
@@ -22,7 +22,7 @@ _G.s2k_Enhancements = _G.s2k_Enhancements or {}
 API = _G.s2k_Enhancements
 -- Backward-compatible API alias for integrations written for the old addon name.
 _G.s2k_Nameplates = API
-API.version = "1.30.0"
+API.version = "1.32.0"
 
 
 DEFAULTS = {
@@ -269,6 +269,7 @@ DEFAULTS = {
     -- HP threshold marker overlay
     hpMarkerEnabled = false,
     hpMarkerOnlyTarget = false,
+    hpMarkerOnlyEnemy = false,
     hpMarkerPercent = 35,
     hpMarkerWidth = 2,
     hpMarkerWidthMode = "LINE",
@@ -320,11 +321,7 @@ DEFAULTS = {
     -- The first time a profile is created, these values are initialized from
     -- the player's current CVars when available.
     nameplateGlobalScale = 1.00,
-    largeNameplates = false,
     nameplateSelectedScale = 1.00,
-    nameplateLargeBottomInset = 0.15,
-    nameplateLargerScale = 1.20,
-    nameplateLargeTopInset = 0.15,
     nameplateMaxDistance = 60,
     nameplateMotion = 0,
     nameplateMotionSpeed = 0.025,
@@ -491,6 +488,42 @@ SIDE_OPTIONS = {
     { key = "LEFT", label = "Left" },
     { key = "RIGHT", label = "Right" },
 }
+
+NAMEPLATE_DESIGN_GROUPS = { "target", "focus", "friendly", "enemy" }
+NAMEPLATE_DIMENSION_GROUPS = { "friendly", "enemy" }
+
+local NAMEPLATE_GENERAL_DESIGN_DEFAULTS = {
+    HealthTextureKey = "BLIZZARD_STATUSBAR",
+    HealthTexturePath = "Interface\\TargetingFrame\\UI-StatusBar",
+    HealthUseReactionColor = true,
+    HealthColorR = 0.85, HealthColorG = 0.10, HealthColorB = 0.10, HealthColorA = 1.00,
+    HealthBackdropTextureKey = "FLAT_WHITE",
+    HealthBackdropTexturePath = "Interface\\Buttons\\WHITE8X8",
+    HealthBackdropColorR = 0.00, HealthBackdropColorG = 0.00, HealthBackdropColorB = 0.00, HealthBackdropColorA = 0.65,
+    BorderTextureKey = "S2K_SOLID",
+    BorderTexturePath = "Interface\\Buttons\\WHITE8X8",
+    BorderSize = 1, BorderInset = 0, BorderOffset = 1,
+    BorderColorR = 0.00, BorderColorG = 0.00, BorderColorB = 0.00, BorderColorA = 1.00,
+    ShowNames = false, ShowHPRatio = true, ShowLevelOverlay = false, ShowHPMarker = false,
+    HPMarkerColorR = 1.00, HPMarkerColorG = 1.00, HPMarkerColorB = 1.00, HPMarkerColorA = 1.00,
+}
+
+for _, group in ipairs(NAMEPLATE_DESIGN_GROUPS) do
+    for suffix, value in pairs(NAMEPLATE_GENERAL_DESIGN_DEFAULTS) do
+        DEFAULTS[group .. suffix] = value
+    end
+end
+DEFAULTS.targetPlayerCastOverlayEnabled = true
+
+for _, group in ipairs(NAMEPLATE_DIMENSION_GROUPS) do
+    DEFAULTS[group .. "PlateWidth"] = 110
+    DEFAULTS[group .. "PlateHeight"] = 12
+    DEFAULTS[group .. "NameplateHitboxWidth"] = 110
+    DEFAULTS[group .. "NameplateHitboxHeight"] = 45
+    DEFAULTS[group .. "HealthbarHitboxXOffset"] = 0
+    DEFAULTS[group .. "HealthbarHitboxYOffset"] = 0
+    DEFAULTS[group .. "HealthbarFrameStrata"] = "HIGH"
+end
 
 ORIGIN_OPTIONS = {
     { key = "LEFT", label = "Left edge" },

@@ -481,23 +481,6 @@ local function RestoreChatFrame(frame)
     end
 end
 
-local function ChatCopyWindowScroll(delta)
-    local window = State.chatCopyWindow
-    if not window then return end
-    local scroll = window.scroll
-    local value = math.max(0, math.min(scroll:GetVerticalScrollRange() or 0, (scroll:GetVerticalScroll() or 0) + delta))
-    scroll:SetVerticalScroll(value)
-    window.editBox:SetFocus()
-end
-
-local function UpdateChatCopyContentHeight(window)
-    local width = math.max(100, window.scroll:GetWidth() - 24)
-    window.editBox:SetWidth(width)
-    window.measure:SetWidth(width - 8)
-    window.measure:SetText(window.editBox:GetText() or "")
-    window.editBox:SetHeight(math.max(window.scroll:GetHeight(), window.measure:GetStringHeight() + 24))
-end
-
 local function SaveChatCopyWindowGeometry(window)
     if not DB or not window then return end
     DB.chatCopyWindowWidth = math.floor(window:GetWidth() + 0.5)
@@ -510,104 +493,15 @@ end
 
 local function CreateChatCopyWindow()
     if State.chatCopyWindow then return State.chatCopyWindow end
-    local window = CreateFrame("Frame", "s2k_ChatCopyWindow", UIParent)
-    window:SetFrameStrata("DIALOG")
-    window:SetClampedToScreen(true)
-    window:SetMovable(true)
-    window:SetResizable(true)
-    window:SetMinResize(320, 240)
-    window:SetBackdrop({ bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background", edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border", edgeSize = 24, insets = { left = 6, right = 6, top = 6, bottom = 6 } })
-    window:EnableMouse(true)
-    window:RegisterForDrag("LeftButton")
-    window:SetScript("OnDragStart", window.StartMoving)
-    window:SetScript("OnDragStop", function(self) self:StopMovingOrSizing(); SaveChatCopyWindowGeometry(self) end)
-    window:SetScript("OnSizeChanged", function(self) if self.scroll then UpdateChatCopyContentHeight(self) end end)
-    window:Hide()
-
-    local title = window:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("TOP", 0, -14)
-    title:SetText(S2K_L("Chat Copy"))
-    window.title = title
-
-    local close = CreateFrame("Button", nil, window, "UIPanelCloseButton")
-    close:SetPoint("TOPRIGHT", -4, -4)
-    close:SetScript("OnClick", function() window:Hide() end)
-
-    local scroll = CreateFrame("ScrollFrame", nil, window, "UIPanelScrollFrameTemplate")
-    scroll:SetPoint("TOPLEFT", 18, -42)
-    scroll:SetPoint("BOTTOMRIGHT", -42, 48)
-    scroll:EnableMouseWheel(true)
-    scroll:SetScript("OnMouseWheel", function(_, delta) ChatCopyWindowScroll(delta > 0 and -48 or 48) end)
-    window.scroll = scroll
-
-    local editBox = CreateFrame("EditBox", nil, scroll)
-    editBox:SetMultiLine(true)
-    editBox:SetAutoFocus(false)
-    editBox:EnableMouse(true)
-    editBox:SetFontObject(ChatFontNormal)
-    editBox:SetTextInsets(4, 4, 4, 4)
-    editBox:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
-    editBox:SetScript("OnTextChanged", function() UpdateChatCopyContentHeight(window) end)
-    local function StopSelectionAutoScroll(self)
-        self.s2kSelecting = false
-        self.s2kScrollElapsed = 0
-        self:SetScript("OnUpdate", nil)
+    local widget = LibStub("AceGUI-3.0"):Create("S2KTextViewerWindow")
+    if not widget then
+        S2KPrint("Missing Chat Copy widget: S2KTextViewerWindow")
+        return nil
     end
-    local function SelectionAutoScroll(self, elapsed)
-        if not self.s2kSelecting or not IsMouseButtonDown("LeftButton") then
-            StopSelectionAutoScroll(self)
-            return
-        end
-        self.s2kScrollElapsed = (self.s2kScrollElapsed or 0) + elapsed
-        if self.s2kScrollElapsed < 0.03 then return end
-        self.s2kScrollElapsed = 0
-        local _, y = GetCursorPosition()
-        local scale = UIParent:GetEffectiveScale()
-        y = y / scale
-        local top, bottom = scroll:GetTop(), scroll:GetBottom()
-        if top and y > top - 18 then ChatCopyWindowScroll(-18)
-        elseif bottom and y < bottom + 18 then ChatCopyWindowScroll(18) end
-    end
-    editBox:SetScript("OnMouseDown", function(self, button)
-        if button == "LeftButton" then
-            self.s2kSelecting = true
-            self.s2kScrollElapsed = 0
-            self:SetScript("OnUpdate", SelectionAutoScroll)
-        end
-    end)
-    editBox:SetScript("OnMouseUp", StopSelectionAutoScroll)
-    editBox:SetScript("OnHide", StopSelectionAutoScroll)
-    scroll:SetScrollChild(editBox)
-    window.editBox = editBox
-
-    local measure = window:CreateFontString(nil, "ARTWORK")
-    measure:SetFontObject(ChatFontNormal)
-    measure:SetJustifyH("LEFT")
-    measure:SetJustifyV("TOP")
-    measure:Hide()
-    window.measure = measure
-
-    local up = CreateFrame("Button", nil, window, "UIPanelButtonTemplate")
-    up:SetSize(88, 24)
-    up:SetPoint("BOTTOMLEFT", 18, 16)
-    up:SetText(S2K_L("Scroll Up"))
-    up:SetScript("OnClick", function() ChatCopyWindowScroll(-96) end)
-
-    local down = CreateFrame("Button", nil, window, "UIPanelButtonTemplate")
-    down:SetSize(88, 24)
-    down:SetPoint("LEFT", up, "RIGHT", 8, 0)
-    down:SetText(S2K_L("Scroll Down"))
-    down:SetScript("OnClick", function() ChatCopyWindowScroll(96) end)
-
-    local resize = CreateFrame("Button", nil, window)
-    resize:SetSize(20, 20)
-    resize:SetPoint("BOTTOMRIGHT", -8, 8)
-    resize:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
-    resize:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
-    resize:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
-    resize:SetScript("OnMouseDown", function(_, button) if button == "LeftButton" then window:StartSizing("BOTTOMRIGHT") end end)
-    resize:SetScript("OnMouseUp", function() window:StopMovingOrSizing(); SaveChatCopyWindowGeometry(window) end)
-
+    local window = widget.frame
+    widget:SetCallback("OnGeometryChanged", function() SaveChatCopyWindowGeometry(window) end)
+    widget.up:SetText(S2K_L("Scroll Up")); widget.down:SetText(S2K_L("Scroll Down"))
+    window.title, window.scroll, window.editBox, window.measure, window.s2kWidget = widget.title, widget.scroll, widget.editBox, widget.measure, widget
     State.chatCopyWindow = window
     return window
 end
@@ -633,6 +527,7 @@ end
 function ShowChatCopyWindow(frame)
     if not CFG.chatEnabled or not CFG.chatCopyEnabled or not frame then return end
     local window = CreateChatCopyWindow()
+    if not window then return end
     local screenWidth, screenHeight = UIParent:GetWidth(), UIParent:GetHeight()
     local width = tonumber(DB.chatCopyWindowWidth) or frame:GetWidth()
     local height = tonumber(DB.chatCopyWindowHeight) or (screenHeight * 0.80)
@@ -647,11 +542,8 @@ function ShowChatCopyWindow(frame)
     end
     local chatName = frame.name
     if not chatName and FCF_GetChatWindowInfo and frame.GetID then chatName = FCF_GetChatWindowInfo(frame:GetID()) end
-    window.title:SetText((chatName or S2K_L("Chat")) .. " - " .. S2K_L("Chat Copy"))
-    window.editBox:SetText(GetChatFrameText(frame))
-    window.editBox:SetCursorPosition(0)
-    window.scroll:SetVerticalScroll(0)
-    UpdateChatCopyContentHeight(window)
+    window.s2kWidget:SetTitle((chatName or S2K_L("Chat")) .. " - " .. S2K_L("Chat Copy"))
+    window.s2kWidget:SetText(GetChatFrameText(frame))
     window:Show()
     window.editBox:SetFocus()
 end

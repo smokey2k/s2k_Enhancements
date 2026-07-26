@@ -124,11 +124,10 @@ function PositionRoot(ctx)
     local uf = GetUnitFrameFromPlate(plate)
     local blizzHB = uf and GetHealthBarFromUF(uf)
 
-    local useTarget = CFG.targetHealthbarOverride and IsTargetUnit(ctx.unit)
-    local plateWidth = tonumber(CFG.plateWidth) or 110
-    local plateHeight = tonumber(CFG.plateHeight) or 12
-    local xOffset = tonumber(CFG.healthbarHitboxXOffset) or 0
-    local yOffset = tonumber(CFG.healthbarHitboxYOffset) or 0
+    local plateWidth = tonumber(GetNameplateDimensionValue(ctx, "PlateWidth", 110)) or 110
+    local plateHeight = tonumber(GetNameplateDimensionValue(ctx, "PlateHeight", 12)) or 12
+    local xOffset = tonumber(GetNameplateDimensionValue(ctx, "HealthbarHitboxXOffset", 0)) or 0
+    local yOffset = tonumber(GetNameplateDimensionValue(ctx, "HealthbarHitboxYOffset", 0)) or 0
 
     root:ClearAllPoints()
     if plate and plate.GetObjectType then
@@ -144,19 +143,10 @@ function PositionRoot(ctx)
 
     SyncCustomFrameLevels(ctx)
 
-    local textureKey, pathKey = 'borderTextureKey', 'borderTexturePath'
-    local sizeKey, insetKey, offsetKey = 'borderSize', 'borderInset', 'borderOffset'
-    local br, bg, bb, ba = GetAllBorderColor()
-
-    -- Border visibility is controlled by the selected normal/target border media.
-    -- Legacy style keys and healthBorder remain in SavedVariables for compatibility.
-    if useTarget then
-        textureKey, pathKey = 'targetBorderTextureKey', 'targetBorderTexturePath'
-        sizeKey, insetKey, offsetKey = 'targetBorderSize', 'targetBorderInset', 'targetBorderOffset'
-        br, bg, bb, ba = GetTargetBorderColor()
-    end
-
-    ApplyBorderVisual(ctx.border, CFG[textureKey], GetConfiguredBorderTexturePath(textureKey, pathKey), CFG[sizeKey], CFG[insetKey], CFG[offsetKey], br, bg, bb, ba)
+    local group = GetNameplateDesignGroup(ctx.unit)
+    local textureKey, pathKey = group .. "BorderTextureKey", group .. "BorderTexturePath"
+    local br, bg, bb, ba = GetCurrentNameplateBorderColor(ctx)
+    ApplyBorderVisual(ctx.border, CFG[textureKey], GetConfiguredBorderTexturePath(textureKey, pathKey), CFG[group .. "BorderSize"], CFG[group .. "BorderInset"], CFG[group .. "BorderOffset"], br, bg, bb, ba)
     ApplyStatusBarBackdropTexture(ctx.background, GetHealthBackdropTexturePath(ctx), GetHealthBackdropColor(ctx))
 end
 

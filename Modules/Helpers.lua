@@ -90,6 +90,46 @@ function IsTargetUnit(unit)
     return a and b and a == b
 end
 
+function IsFocusUnit(unit)
+    if not unit or not UnitExists(unit) or not UnitExists("focus") then return false end
+    if UnitIsUnit then
+        local ok, same = pcall(UnitIsUnit, unit, "focus")
+        if ok and same then return true end
+    end
+    local a = UnitGUID and UnitGUID(unit)
+    local b = UnitGUID and UnitGUID("focus")
+    return a and b and a == b
+end
+
+function GetNameplateDimensionGroup(unit)
+    if unit and UnitCanAttack and UnitCanAttack("player", unit) then return "enemy" end
+    return "friendly"
+end
+
+function GetNameplateDesignGroup(unit)
+    if IsTargetUnit(unit) then return "target" end
+    if IsFocusUnit(unit) then return "focus" end
+    return GetNameplateDimensionGroup(unit)
+end
+
+function GetNameplateDimensionValue(ctxOrUnit, suffix, fallback)
+    local unit = type(ctxOrUnit) == "table" and ctxOrUnit.unit or ctxOrUnit
+    local value = CFG and CFG[GetNameplateDimensionGroup(unit) .. tostring(suffix or "")]
+    if value == nil then value = fallback end
+    return value
+end
+
+function GetNameplateDesignValue(ctxOrUnit, suffix, fallback)
+    local unit = type(ctxOrUnit) == "table" and ctxOrUnit.unit or ctxOrUnit
+    local value = CFG and CFG[GetNameplateDesignGroup(unit) .. tostring(suffix or "")]
+    if value == nil then value = fallback end
+    return value
+end
+
+function IsNameplateOverlayEnabled(ctxOrUnit, suffix)
+    return GetNameplateDesignValue(ctxOrUnit, suffix, false) == true
+end
+
 function FrameIsVisible(frame)
     if not IsFrameObject(frame) then return false end
 
@@ -185,20 +225,12 @@ function GetCustomColor(prefix, fallbackR, fallbackG, fallbackB, fallbackA)
 end
 
 function GetHealthbarColor(unit)
-    if CFG.targetHealthbarOverride and IsTargetUnit(unit) then
-        if CFG.targetHealthUseReactionColor then
-            local r, g, b = GetReactionColor(unit)
-            return r, g, b, 1
-        end
-        return GetCustomColor('targetHealthColor', 0.85, 0.10, 0.10, 1)
-    end
-
-    if CFG.healthUseReactionColor then
+    local group = GetNameplateDesignGroup(unit)
+    if CFG[group .. "HealthUseReactionColor"] then
         local r, g, b = GetReactionColor(unit)
         return r, g, b, 1
     end
-
-    return GetCustomColor("healthColor", 0.85, 0.10, 0.10, 1)
+    return GetCustomColor(group .. "HealthColor", 0.85, 0.10, 0.10, 1)
 end
 
 function GetCastbarColor()
@@ -206,10 +238,8 @@ function GetCastbarColor()
 end
 
 function GetHealthBackdropColor(ctx)
-    if ctx and CFG.targetHealthbarOverride and IsTargetUnit(ctx.unit) then
-        return GetCustomColor('targetHealthBackdropColor', 0.00, 0.00, 0.00, 0.65)
-    end
-    return GetCustomColor('healthBackdropColor', 0.00, 0.00, 0.00, CFG.healthBackgroundAlpha or 0.65)
+    local group = GetNameplateDesignGroup(ctx and ctx.unit)
+    return GetCustomColor(group .. "HealthBackdropColor", 0.00, 0.00, 0.00, 0.65)
 end
 
 function GetCastbarSpellNameColor()
@@ -240,32 +270,23 @@ function GetHPRatioColor()
     return GetCustomColor("hpRatioColor", 1.00, 1.00, 1.00, 1.00)
 end
 
-function GetHPMarkerColor()
-    return GetCustomColor("hpMarkerColor", 1.00, 1.00, 1.00, 1.00)
-end
-
-function GetAllBorderColor()
-    return GetCustomColor("borderColor", 0.00, 0.00, 0.00, 1)
-end
-
-function GetTargetBorderColor()
-    return GetCustomColor("targetBorderColor", 1.00, 1.00, 1.00, 1)
+function GetHPMarkerColor(ctx)
+    local group = GetNameplateDesignGroup(ctx and ctx.unit)
+    return GetCustomColor(group .. "HPMarkerColor", 1.00, 1.00, 1.00, 1.00)
 end
 
 function GetCurrentNameplateBorderColor(ctx)
-    if ctx and ctx.unit and CFG.targetHealthbarOverride and IsTargetUnit(ctx.unit) then
-        return GetTargetBorderColor()
-    end
-    return GetAllBorderColor()
+    local group = GetNameplateDesignGroup(ctx and ctx.unit)
+    return GetCustomColor(group .. "BorderColor", 0.00, 0.00, 0.00, 1)
 end
 
 function GetHPMarkerEffectiveColor(ctx)
-    local _, _, _, markerAlpha = GetHPMarkerColor()
+    local _, _, _, markerAlpha = GetHPMarkerColor(ctx)
     if CFG.hpMarkerUseBorderColor then
         local r, g, b = GetCurrentNameplateBorderColor(ctx)
         return r, g, b, markerAlpha
     end
-    return GetHPMarkerColor()
+    return GetHPMarkerColor(ctx)
 end
 
 function SetCVarIfChanged(cvarName, value)
@@ -288,8 +309,8 @@ function SetCVarIfChanged(cvarName, value)
         end
     end
 
-    SetCVar(cvarName, textValue)
-    return true
+    local ok = pcall(SetCVar, cvarName, textValue)
+    return ok and true or false
 end
 
 function ApplyNameplateBaseCVar()
@@ -300,13 +321,14 @@ end
 function ApplyNameplateHitboxSize()
     if not C_NamePlate then return end
 
-    local width = math.max(1, tonumber(CFG.nameplateHitboxWidth) or 110)
-    local height = math.max(1, tonumber(CFG.nameplateHitboxHeight) or 45)
-
     if C_NamePlate.SetNamePlateEnemySize then
+        local width = math.max(1, tonumber(CFG.enemyNameplateHitboxWidth) or 110)
+        local height = math.max(1, tonumber(CFG.enemyNameplateHitboxHeight) or 45)
         pcall(C_NamePlate.SetNamePlateEnemySize, width, height)
     end
     if C_NamePlate.SetNamePlateFriendlySize then
+        local width = math.max(1, tonumber(CFG.friendlyNameplateHitboxWidth) or 110)
+        local height = math.max(1, tonumber(CFG.friendlyNameplateHitboxHeight) or 45)
         pcall(C_NamePlate.SetNamePlateFriendlySize, width, height)
     end
 end
@@ -321,10 +343,6 @@ function ApplyNameplateCVarSettings()
     State.applyingNameplateCVars = true
     ApplyNameplateBaseCVar()
     ApplyNameplateHitboxSize()
-
-    local large = CFG.largeNameplates == true
-    local largeModeChanged = SetCVarIfChanged("NamePlateHorizontalScale", large and 1.4 or 1.0)
-    largeModeChanged = SetCVarIfChanged("NamePlateVerticalScale", large and 2.7 or 1.0) or largeModeChanged
 
     for key, def in pairs(CVAR_OPTION_DEFS) do
         local value = tonumber(CFG[key])
@@ -343,13 +361,22 @@ function ApplyNameplateCVarSettings()
         SetCVarIfChanged(def.cvar, CFG[key] and 1 or 0)
     end
 
-    if largeModeChanged and NamePlateDriverFrame and NamePlateDriverFrame.UpdateNamePlateOptions then
-        pcall(NamePlateDriverFrame.UpdateNamePlateOptions, NamePlateDriverFrame)
-    end
     State.applyingNameplateCVars = false
 end
 
-function SyncNameplateSettingFromCVar(cvarName)
+local function RestoreManagedNameplateCVar(cvarName, desired)
+    if InCombatLockdown and InCombatLockdown() then
+        State.pendingCVarApply = true
+        return false
+    end
+
+    State.applyingNameplateCVars = true
+    local changed = SetCVarIfChanged(cvarName, desired)
+    State.applyingNameplateCVars = false
+    return changed
+end
+
+function EnforceManagedNameplateCVar(cvarName)
     if State.applyingNameplateCVars or not DB or not CFG then
         return false, false
     end
@@ -359,46 +386,35 @@ function SyncNameplateSettingFromCVar(cvarName)
         return false, false
     end
 
-    if normalized == "nameplatehorizontalscale" or normalized == "nameplateverticalscale" then
-        local vertical = GetNumericCVar("NamePlateVerticalScale", 1)
-        local large = vertical > 1.001
-        if CFG.largeNameplates ~= large then
-            SetBool("largeNameplates", large)
-            return true, true
-        end
-        return false, false
-    end
-
     local mapping = NAMEPLATE_CVAR_KEYS_BY_NAME and NAMEPLATE_CVAR_KEYS_BY_NAME[normalized]
     if not mapping then
         return false, false
     end
 
+    local desired
+    local current
     if mapping.boolean then
-        local value = GetBooleanCVar(cvarName, CFG[mapping.key])
-        if CFG[mapping.key] ~= value then
-            SetBool(mapping.key, value)
-            return true, false
-        end
+        desired = CFG[mapping.key] and 1 or 0
+        current = GetBooleanCVar(cvarName, desired ~= 0) and 1 or 0
     elseif mapping.atBase then
-        local value = GetNumericCVar(cvarName, 0) == 2
-        if CFG[mapping.key] ~= value then
-            SetBool(mapping.key, value)
-            return true, false
-        end
+        desired = CFG[mapping.key] and 2 or 0
+        current = GetNumericCVar(cvarName, desired)
     elseif mapping.numeric then
         local def = CVAR_OPTION_DEFS[mapping.key]
-        local value = GetNumericCVar(cvarName, def and def.default or CFG[mapping.key])
+        desired = tonumber(CFG[mapping.key])
+        if desired == nil then desired = def and def.default or 0 end
+        current = GetNumericCVar(cvarName, desired)
         if def and def.integer then
-            value = math.floor(value + 0.5)
+            desired = math.floor(desired + 0.5)
+            current = math.floor((tonumber(current) or desired) + 0.5)
         end
-        if tonumber(CFG[mapping.key]) ~= value then
-            SetNum(mapping.key, value)
-            local refreshScale = mapping.key == "nameplateGlobalScale"
-                or mapping.key == "nameplateSelectedScale"
-                or mapping.key == "nameplateLargerScale"
-            return true, refreshScale
-        end
+    end
+
+    if desired ~= nil and math.abs((tonumber(current) or desired) - desired) > 0.000001 then
+        RestoreManagedNameplateCVar(mapping.cvar or cvarName, desired)
+        local refreshScale = mapping.key == "nameplateGlobalScale"
+            or mapping.key == "nameplateSelectedScale"
+        return true, refreshScale
     end
 
     return false, false

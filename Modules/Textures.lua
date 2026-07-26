@@ -18,6 +18,12 @@ BORDER_PATH_SETTINGS = {
     {'castbarBorderTextureKey', 'castbarBorderTexturePath'},
 }
 
+for _, group in ipairs(NAMEPLATE_DESIGN_GROUPS or {}) do
+    STATUSBAR_PATH_SETTINGS[#STATUSBAR_PATH_SETTINGS + 1] = { group .. "HealthTextureKey", group .. "HealthTexturePath" }
+    STATUSBAR_PATH_SETTINGS[#STATUSBAR_PATH_SETTINGS + 1] = { group .. "HealthBackdropTextureKey", group .. "HealthBackdropTexturePath" }
+    BORDER_PATH_SETTINGS[#BORDER_PATH_SETTINGS + 1] = { group .. "BorderTextureKey", group .. "BorderTexturePath" }
+end
+
 BUILTIN_BORDER_OPTIONS = {
     {key='S2K_SOLID', label='Solid', path='Interface\\Buttons\\WHITE8X8'},
     {key='BLIZZARD_TOOLTIP', label='Blizzard Tooltip', path='Interface\\Tooltips\\UI-Tooltip-Border'},
@@ -111,12 +117,10 @@ function GetConfiguredBorderTexturePath(key, pathKey)
 end
 
 function GetHealthTexturePath(ctx)
-    if ctx and CFG.targetHealthbarOverride and IsTargetUnit(ctx.unit) then
-        local targetOption = GetStatusBarTextureOption(CFG.targetHealthTextureKey, CFG.targetHealthTexturePath)
-        return targetOption and targetOption.path or CFG.targetHealthTexturePath or 'Interface/TargetingFrame/UI-StatusBar'
-    end
-    local option = GetStatusBarTextureOption(CFG.healthTextureKey, CFG.healthTexturePath or CFG.healthTexture)
-    return option and option.path or CFG.healthTexturePath or CFG.healthTexture or "Interface\\TargetingFrame\\UI-StatusBar"
+    local group = GetNameplateDesignGroup(ctx and ctx.unit)
+    local key, pathKey = group .. "HealthTextureKey", group .. "HealthTexturePath"
+    local option = GetStatusBarTextureOption(CFG[key], CFG[pathKey])
+    return option and option.path or CFG[pathKey] or "Interface\\TargetingFrame\\UI-StatusBar"
 end
 
 function GetCastbarTexturePath()
@@ -125,12 +129,10 @@ function GetCastbarTexturePath()
 end
 
 function GetHealthBackdropTexturePath(ctx)
-    if ctx and CFG.targetHealthbarOverride and IsTargetUnit(ctx.unit) then
-        local targetOption = GetStatusBarTextureOption(CFG.targetHealthBackdropTextureKey, CFG.targetHealthBackdropTexturePath)
-        return targetOption and targetOption.path or CFG.targetHealthBackdropTexturePath or 'Interface/Buttons/WHITE8X8'
-    end
-    local option = GetStatusBarTextureOption(CFG.healthBackdropTextureKey, CFG.healthBackdropTexturePath)
-    return option and option.path or CFG.healthBackdropTexturePath or 'Interface/Buttons/WHITE8X8'
+    local group = GetNameplateDesignGroup(ctx and ctx.unit)
+    local key, pathKey = group .. "HealthBackdropTextureKey", group .. "HealthBackdropTexturePath"
+    local option = GetStatusBarTextureOption(CFG[key], CFG[pathKey])
+    return option and option.path or CFG[pathKey] or "Interface\\Buttons\\WHITE8X8"
 end
 
 function GetCastbarBackdropTexturePath()
@@ -206,7 +208,7 @@ function ApplyContextStatusBarTextures(ctx)
         ApplyStatusBarBackdropTexture(ctx.cast.bg, GetCastbarBackdropTexturePath(), GetCastbarBackdropColor())
     end
     if ctx.playerCastOverlay then
-        ApplyStatusBarTexture(ctx.playerCastOverlay, GetHealthTexturePath())
+        ApplyStatusBarTexture(ctx.playerCastOverlay, GetHealthTexturePath(ctx))
     end
     if ctx.playerCastOverlaySpark and ctx.playerCastOverlaySpark.texture then
         ApplyTexturePath(ctx.playerCastOverlaySpark.texture, GetPlayerCastOverlaySparkTexturePath())

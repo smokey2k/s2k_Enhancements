@@ -91,6 +91,22 @@ function S2KNP_ModuleEnabled(key)
         return (CFG.buffFrameEnabled ~= false) or (CFG.debuffFrameEnabled ~= false)
     end
     if S2KNP_CUSTOM_NAMEPLATE_VIRTUAL_MODULES[key] then return true end
+    local suffixByKey = {
+        names = 'ShowNames',
+        hpRatio = 'ShowHPRatio',
+        levelOverlay = 'ShowLevelOverlay',
+        hpMarker = 'ShowHPMarker',
+    }
+    local suffix = suffixByKey[key]
+    if suffix then
+        for _, group in ipairs(NAMEPLATE_DESIGN_GROUPS or {}) do
+            if CFG[group .. suffix] == true then return true end
+        end
+        return false
+    end
+    if key == 'playerCastOverlay' then
+        return CFG.targetPlayerCastOverlayEnabled == true
+    end
 
     local def = S2KNP_MODULE_DEFS_BY_KEY[key]
     return def and (not def.cvar or CFG[def.cvar] ~= false) or false
@@ -99,18 +115,24 @@ end
 function S2KNP_RebuildRuntimeFlags()
     local flags = State.runtimeFlags or {}
     local enabled = DB ~= nil and CFG and CFG.enabled ~= false
+    local function AnyDesignEnabled(suffix)
+        for _, group in ipairs(NAMEPLATE_DESIGN_GROUPS or {}) do
+            if CFG[group .. suffix] == true then return true end
+        end
+        return false
+    end
 
     flags.enabled = enabled
     flags.health = enabled
-    flags.names = enabled and CFG.showNames ~= false
-    flags.hpRatio = enabled and CFG.hpRatioText ~= false
-    flags.levelOverlay = enabled and CFG.levelOverlayEnabled ~= false
-    flags.hpMarker = enabled and CFG.hpMarkerEnabled ~= false
+    flags.names = enabled and AnyDesignEnabled("ShowNames")
+    flags.hpRatio = enabled and AnyDesignEnabled("ShowHPRatio")
+    flags.levelOverlay = enabled and AnyDesignEnabled("ShowLevelOverlay")
+    flags.hpMarker = enabled and AnyDesignEnabled("ShowHPMarker")
     flags.castbar = enabled and CFG.showCastbar ~= false
     flags.buffs = enabled and CFG.buffFrameEnabled ~= false
     flags.debuffs = enabled and CFG.debuffFrameEnabled ~= false
     flags.auras = flags.buffs or flags.debuffs
-    flags.playerCastOverlay = enabled and CFG.playerCastOverlayEnabled ~= false
+    flags.playerCastOverlay = enabled and CFG.targetPlayerCastOverlayEnabled == true
     flags.targetRuntimeHealth = enabled and CFG.moduleTargetRuntimeHealthEnabled ~= false
     flags.weakAurasModule = enabled and CFG.moduleWeakAurasEnabled ~= false
     flags.weakAuras = flags.weakAurasModule and CFG.weakAurasEnabled == true
@@ -148,6 +170,7 @@ function S2KNP_RegisterBaseEvents()
     A:RegisterEvent("NAME_PLATE_UNIT_ADDED")
     A:RegisterEvent("NAME_PLATE_UNIT_REMOVED")
     A:RegisterEvent("PLAYER_TARGET_CHANGED")
+    A:RegisterEvent("PLAYER_FOCUS_CHANGED")
     A:RegisterEvent("PLAYER_REGEN_ENABLED")
     A:RegisterEvent("CVAR_UPDATE")
     A:RegisterEvent("QUEST_DETAIL")
@@ -222,16 +245,31 @@ function S2KNP_SetModuleEnabled(key, enabled)
         return false
     end
 
-    local def = S2KNP_MODULE_DEFS_BY_KEY[key]
-    if not def or not def.cvar then
-        return false
-    end
+    local suffixByKey = {
+        names = 'ShowNames',
+        hpRatio = 'ShowHPRatio',
+        levelOverlay = 'ShowLevelOverlay',
+        hpMarker = 'ShowHPMarker',
+    }
+    local suffix = suffixByKey[key]
+    if suffix then
+        for _, group in ipairs(NAMEPLATE_DESIGN_GROUPS or {}) do
+            SetBool(group .. suffix, enabled and true or false)
+        end
+    elseif key == 'playerCastOverlay' then
+        SetBool('targetPlayerCastOverlayEnabled', enabled and true or false)
+    else
+        local def = S2KNP_MODULE_DEFS_BY_KEY[key]
+        if not def or not def.cvar then
+            return false
+        end
 
-    if SetBool then
-        SetBool(def.cvar, enabled and true or false)
-    elseif DB and CFG then
-        DB[def.cvar] = enabled and true or false
-        CFG[def.cvar] = DB[def.cvar]
+        if SetBool then
+            SetBool(def.cvar, enabled and true or false)
+        elseif DB and CFG then
+            DB[def.cvar] = enabled and true or false
+            CFG[def.cvar] = DB[def.cvar]
+        end
     end
 
     S2KNP_ApplyModuleState()

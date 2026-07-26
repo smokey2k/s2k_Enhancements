@@ -15,10 +15,13 @@ local function Parse(value)
  return path,label or tostring(value or "")
 end
 local function BorderColor(widget)
+ local prefix=widget.s2kBorderColorPrefix
+ if prefix and CFG then
+  local color=CFG[prefix..'BorderColor']
+  if type(color)=='table' then return color[1] or 1,color[2] or 1,color[3] or 1,color[4] or 1 end
+ end
  local label=widget.label and widget.label:GetText() or ""
- if label==(S2K_L and S2K_L("Target border texture") or "Target border texture") and GetTargetBorderColor then return GetTargetBorderColor() end
  if label==(S2K_L and S2K_L("Castbar border texture") or "Castbar border texture") and GetCastbarBorderColor then return GetCastbarBorderColor() end
- if GetAllBorderColor then return GetAllBorderColor() end
  return 1,1,1,1
 end
 local function ClearItemDecorators(widget)
@@ -201,6 +204,7 @@ end
 		self.list = nil
 		self.open = nil
 		self.hasClose = nil
+		self.s2kBorderColorPrefix = nil
 		
 		self.frame:ClearAllPoints()
 		self.frame:Hide()

@@ -927,7 +927,6 @@ local function BuildTabs(group, options, path, appName)
 	local opts = new()
 
 	BuildSortedOptionsTable(group, keySort, opts, options, path, appName)
-
 	for i = 1, #keySort do
 		local k = keySort[i]
 		local v = opts[k]
@@ -1061,6 +1060,43 @@ local function InjectInfo(control, options, option, path, rootframe, appName)
 	control:SetCallback("OnEnter", OptionOnMouseOver)
 end
 
+local GroupSelected
+local GroupExists
+local TreeOnButtonEnter
+local TreeOnButtonLeave
+
+local function IsS2KInlineTabbedSection(group)
+	return group and group.arg == "S2K_INLINE_TABS"
+end
+
+local function HasS2KInlineTabbedSection(group)
+	for _, option in pairs(group and group.args or {}) do
+		if IsS2KInlineTabbedSection(option) then return true end
+	end
+	return false
+end
+
+local function FinishS2KInlineTabScrollLayout(frame)
+	frame:SetScript("OnUpdate", nil)
+	local scroll = frame.obj
+	if not scroll or not scroll:GetUserData("s2kInlineTabOuterScroll") then return end
+	for _, section in ipairs(scroll.children) do
+		if section.type ~= "S2KInlineTabGroup" then
+			for _, tab in ipairs(section.children or {}) do if tab.DoLayout then tab:DoLayout() end end
+		end
+		if section.DoLayout then section:DoLayout() end
+	end
+	scroll:DoLayout()
+	if scroll.FixScroll then scroll:FixScroll() end
+	GameTooltip:Hide()
+end
+
+local function ScheduleS2KInlineTabScrollLayout(scroll)
+	if scroll and scroll:GetUserData("s2kInlineTabOuterScroll") then
+		scroll.frame:SetScript("OnUpdate", FinishS2KInlineTabScrollLayout)
+	end
+end
+
 
 --[[
 	options - root of the options table being fed
@@ -1074,6 +1110,25 @@ local function FeedOptions(appName, options,container,rootframe,path,group,inlin
 	local opts = new()
 
 	BuildSortedOptionsTable(group, keySort, opts, options, path, appName)
+	local visibleSectionCount = 0
+	local hasVisibleUngroupedOptions
+	for sectionIndex = 1, #keySort do
+		local sectionKey = keySort[sectionIndex]
+		local section = opts[sectionKey]
+		tinsert(path, sectionKey)
+		if not CheckOptionHidden(section, options, path, appName) then
+			if section.type == "group" then
+				if IsS2KInlineTabbedSection(section) or inline or pickfirstset(section.dialogInline,section.guiInline,section.inline, false) then
+					visibleSectionCount = visibleSectionCount + 1
+				end
+			else
+				hasVisibleUngroupedOptions = true
+			end
+		end
+		tremove(path)
+	end
+	if hasVisibleUngroupedOptions then visibleSectionCount = visibleSectionCount + 1 end
+	local showSectionTitles = visibleSectionCount > 1
 
 	for i = 1, #keySort do
 		local k = keySort[i]
@@ -1083,12 +1138,34 @@ local function FeedOptions(appName, options,container,rootframe,path,group,inlin
 		local name = GetOptionsMemberValue("name", v, options, path, appName)
 		if not hidden then
 			if v.type == "group" then
-				if inline or pickfirstset(v.dialogInline,v.guiInline,v.inline, false) then
+				if IsS2KInlineTabbedSection(v) then
+					local tab = gui:Create("S2KInlineTabGroup")
+					tab:SetTitle(showSectionTitles and name or "")
+					InjectInfo(tab, options, v, path, rootframe, appName)
+					tab:SetCallback("OnGroupSelected", GroupSelected)
+					tab:SetCallback("OnTabEnter", TreeOnButtonEnter)
+					tab:SetCallback("OnTabLeave", TreeOnButtonLeave)
+					local status = AceConfigDialog:GetStatusTable(appName, path)
+					if not status.groups then status.groups = {} end
+					tab:SetStatusTable(status.groups)
+					tab.width = "fill"
+					local tabs = BuildGroups(v, options, path, appName)
+					tab:SetTabs(tabs)
+					tab:SetUserData("tablist", tabs)
+					container:AddChild(tab)
+					for tabIndex = 1, #tabs do
+						local entry = tabs[tabIndex]
+						if not entry.disabled then
+							tab:SelectTab((GroupExists(appName, options, path, status.groups.selected) and status.groups.selected) or entry.value)
+							break
+						end
+					end
+				elseif inline or pickfirstset(v.dialogInline,v.guiInline,v.inline, false) then
 					--Inline group
 					local GroupContainer
 					if name and name ~= "" then
 						GroupContainer = gui:Create("InlineGroup")
-						GroupContainer:SetTitle(name or "")
+						GroupContainer:SetTitle(showSectionTitles and name or "")
 					else
 						GroupContainer = gui:Create("SimpleGroup")
 					end
@@ -1449,7 +1526,7 @@ local function BuildPath(path, ...)
 end
 
 
-local function TreeOnButtonEnter(widget, event, uniquevalue, button)
+TreeOnButtonEnter = function(widget, event, uniquevalue, button)
 	local user = widget:GetUserDataTable()
 	if not user then return end
 	local options = user.options
@@ -1488,12 +1565,12 @@ local function TreeOnButtonEnter(widget, event, uniquevalue, button)
 	GameTooltip:Show()
 end
 
-local function TreeOnButtonLeave(widget, event, value, button)
+TreeOnButtonLeave = function(widget, event, value, button)
 	GameTooltip:Hide()
 end
 
 
-local function GroupExists(appName, options, path, uniquevalue)
+GroupExists = function(appName, options, path, uniquevalue)
 	if not uniquevalue then return false end
 	
 	local feedpath = new()
@@ -1521,7 +1598,7 @@ local function GroupExists(appName, options, path, uniquevalue)
 	return true
 end
 
-local function GroupSelected(widget, event, uniquevalue)
+GroupSelected = function(widget, event, uniquevalue)
 
 	local user = widget:GetUserDataTable()
 
@@ -1540,8 +1617,16 @@ local function GroupSelected(widget, event, uniquevalue)
 	for i = 1, #feedpath do
 		group = GetSubOption(group, feedpath[i])
 	end
+	if widget:GetUserData("s2kInlineTabNaturalHeight") then GameTooltip:Hide() end
 	widget:ReleaseChildren()
 	AceConfigDialog:FeedGroup(user.appName,options,widget,rootframe,feedpath)
+	if widget:GetUserData("s2kInlineTabNaturalHeight") then
+		local section = widget
+		local outerScroll = widget.parent
+		if outerScroll and not outerScroll:GetUserData("s2kInlineTabOuterScroll") then outerScroll=outerScroll.parent end
+		if section.DoLayout then section:DoLayout() end
+		ScheduleS2KInlineTabScrollLayout(outerScroll)
+	end
 
 	del(feedpath)
 end
@@ -1604,9 +1689,10 @@ function AceConfigDialog:FeedGroup(appName,options,container,rootframe,path, isR
 	local scroll
 
 	--Add a scrollframe if we are not going to add a group control, this is the inverse of the conditions for that later on
-	if (not (hasChildGroups and not inline)) or (grouptype ~= "tab" and grouptype ~= "select" and (parenttype == "tree" and not isRoot)) then
+	if not container:GetUserData("s2kInlineTabNaturalHeight") and ((not (hasChildGroups and not inline)) or (grouptype ~= "tab" and grouptype ~= "select" and (parenttype == "tree" and not isRoot))) then
 		if container.type ~= "InlineGroup" and container.type ~= "SimpleGroup" then
 			scroll = gui:Create("ScrollFrame")
+			scroll:SetUserData("s2kInlineTabOuterScroll", HasS2KInlineTabbedSection(group) or nil)
 			scroll:SetLayout("flow")
 			scroll.width = "fill"
 			scroll.height = "fill"
@@ -1625,6 +1711,7 @@ function AceConfigDialog:FeedGroup(appName,options,container,rootframe,path, isR
 			status.scroll = {}
 		end
 		scroll:SetStatusTable(status.scroll)
+		ScheduleS2KInlineTabScrollLayout(scroll)
 	end
 
 	if hasChildGroups and not inline then

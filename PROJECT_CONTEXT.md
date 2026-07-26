@@ -2,61 +2,102 @@
 
 ## Current state
 
-Current stable version: 1.30.0
-Target client: World of Warcraft 7.3.5
-Interface version: 70300
+- Current stable version: 1.32.0
+- Target client: World of Warcraft 7.3.5
+- Interface version: 70300
+- Lua compatibility target: Lua 5.1
 
 ## Purpose
 
-s2k:Enhancements contains custom nameplates, configurable hitboxes and strata, aura and overlay frames, an animated layout preview, quest workflow and reward enhancements, Blizzard camera and SpellQueueWindow tweaks, WeakAuras and Dominos integrations, launchers and a standalone configuration window.
+s2k:Enhancements provides custom nameplates, configurable healthbar and hitbox geometry, castbars, aura and overlay frames, a live layout preview, chat tools, quest workflow and reward enhancements, authoritative Blizzard CVar management, WeakAuras and Dominos integrations, launchers, profiles, diagnostics, and a standalone configuration window.
 
-## Important architecture
+## Core architecture
 
-- No panel is registered with Blizzard Interface Options, avoiding Compact Raid Frame profile taint on Legion.
-- Configuration opens through /s2ke, LibDataBroker or the minimap icon.
-- SavedVariables are s2k_EnhancementsDB with legacy s2k_NameplatesDB migration support.
-- Existing profiles and configuration keys must remain backward compatible.
-- Embedded libraries are stored under Libs.
-- The standalone UI uses embedded AceGUI-3.0 and AceConfig-3.0 pinned to the WoW 7.3.5-compatible r1179 era.
-- Configuration controls use isolated S2K AceGUI widget types for the window, checkboxes, color pickers, sliders, text dropdowns, statusbar-texture dropdowns and border dropdowns; the options schema selects these types directly, without post-build decoration or label-based widget detection.
-- AceDB is not used yet; the backward-compatible custom profile database remains active.
+- The addon deliberately does not register a Blizzard Interface Options panel, avoiding Compact Raid Frame profile taint on Legion.
+- Configuration opens through `/s2ke`, LibDataBroker, or the minimap launcher.
+- `s2k_EnhancementsDB` is the authoritative SavedVariables database. Legacy `s2k_NameplatesDB` data remains supported through migration.
+- Existing profiles and saved configuration keys must remain backward compatible.
+- AceDB is not used; the backward-compatible custom profile database remains authoritative.
+- Embedded libraries live under `Libs` and remain compatible with the WoW 7.3.5-era API surface.
+- Runtime modules prefer event-driven updates, targeted refreshes, cached Blizzard visual discovery, and combat-safe deferred work.
+
+## Configuration UI
+
+- The standalone UI is built from reusable S2K AceGUI widget types rather than feature-specific frame construction.
+- Shared types cover the main frame lifecycle, inline tab groups, checkboxes, color pickers, sliders, text/statusbar/border dropdowns, text-viewer windows, and diagnostic stats panels.
+- S2K widget types register against whichever `AceGUI-3.0` library is active, including when another addon such as Mapster loaded AceGUI first.
+- `S2KFrame` owns persistent header Close/collapse controls, resizing, movement, collapse state, and pooled lifecycle cleanup.
+- Natural-height inline tabs use `S2KInlineTabGroup`, one outer page scrollbar, and the shared AceConfig renderer. Option modules define ordered child groups and do not build tab frames manually.
+- Section headings are derived from visible sibling structure: multi-section pages retain headings, while a selected tab or single section does not repeat its own title.
+- Ordinary slider, dropdown, checkbox, and color changes update their targeted runtime consumer without rebuilding the complete options panel.
 
 ## Nameplates
 
-Custom Nameplates is the master switch. Subpages are General, Healthbar, Castbar, Overlays, Buffs and Debuffs. General and target healthbars share dimensions and hitbox placement. Target appearance can still be overridden. Child visuals inherit healthbar frame strata while overlay frame levels remain independently configurable.
+- Custom Nameplates is the master switch. The configuration pages are General, Healthbar, Castbar, Overlays, Buffs, and Debuffs.
+- Design priority is Target, then Focus, then Friendly or Enemy reaction group.
+- Target, Focus, Friendly, and Enemy have independent design settings. Player Cast Overlay is available only for Target.
+- Friendly and Enemy have independent healthbar size, hitbox size, healthbar offset inside the hitbox, and frame strata. Target and Focus inherit dimensions from the unit's Friendly or Enemy classification.
+- Runtime and preview plates share one visual-tree constructor for health, backdrop, border, cast, text, marker, icon, and aura objects.
+- Blizzard castbar, UnitFrame, and nameplate visual objects are discovered once per owner and cached instead of repeatedly walking visual trees.
+- Managed nameplate CVars are authoritative. Saved values are applied at initialization and profile changes, and later external `CVAR_UPDATE` changes are restored without importing them into the profile.
+- Protected Blizzard frames are never modified during combat; required work is deferred until combat ends.
 
-Disabling Custom Nameplates requires UI reload and restores Blizzard visuals. Protected Blizzard frames must never be modified during combat.
+## Nameplate layout preview
 
-## Quest tweaks
+- The preview displays Target, Focus, Friendly, and Enemy using the same underlying visual hierarchy as runtime plates.
+- It responds immediately to healthbar dimensions, hitbox dimensions, offsets, overlap CVars, design settings, and motion mode without a full AceConfig rebuild.
+- Overlapping/default places the synthetic unit anchors together to demonstrate overlap.
+- Stacking creates a vertical collision stack using neighboring hitbox heights and `nameplateOverlapV`.
+- Spread creates a 2x2 Target/Focus/Friendly/Enemy collision matrix using hitbox sizes, `nameplateOverlapH`, and `nameplateOverlapV`.
+- The complete preview layout scales to the available canvas in both dimensions.
 
-Optional features include automatic accept, automatic turn-in without automatic reward choice, quest levels, tooltip objective progress, shared-quest acceptance, reputation rewards and all currency rewards reported by the Legion quest API.
+## CVar management
+
+- Addon-managed CVars include nameplate visibility/layout settings, camera distance, Spell Queue Window, and spell-activation overlays.
+- Saved addon values remain authoritative after initialization. Blizzard or third-party changes are detected through `CVAR_UPDATE` and corrected through targeted enforcement.
+- CVar enforcement avoids polling and defers combat-sensitive work.
+
+## Chat tools
+
+- `/clear` and `/cls` clear the selected chat window and are documented by `/s2ke help`.
+- Shift-clicking a chat tab opens Chat Copy through the reusable `S2KTextViewerWindow`, including resizing, saved geometry, scrolling, and selection auto-scroll.
 
 ## Dominos integration
 
-Dominos mode restores normal positions, docking and Show States. Editable mode temporarily saves these values and arranges selected bars horizontally or vertically with screen-aware wrapping. Right-clicking the minimap or LDB launcher toggles the mode when requirements are met.
+- Dominos mode restores normal positions, docking, and Show States through the verified `GetShowStates` and `SetShowStates` API.
+- Editable mode temporarily stores those values and arranges selected bars horizontally or vertically with screen-aware wrapping.
+- Right-clicking the minimap or LDB launcher toggles the mode when requirements are met.
 
 ## WeakAuras integration
 
-Required client: WoW 7.3.5. Minimum supported WeakAuras version: 2.5.12. Bridge anchors connect supported target-nameplate WeakAuras groups without forcing user layout and style fields.
+- Required client: World of Warcraft 7.3.5.
+- Minimum supported WeakAuras version: 2.5.12.
+- UIParent-based bridge anchors connect supported target-nameplate WeakAuras groups without forcing user layout or style fields.
+
+## Quest tweaks
+
+Optional features include automatic quest acceptance, automatic turn-in without automatic reward selection, quest levels, tooltip objective progress, shared-quest acceptance, reputation rewards, and all currency rewards exposed by the Legion quest API.
 
 ## Testing priorities
 
-1. Open and resize configuration with /s2ke, LDB and minimap launchers.
-2. Test nameplate creation, recycling, target switching, casting, auras, strata and hitbox clicks.
-3. Test general and target layout previews.
-4. Test quest detail, log and completion panels with reputation and currency rewards.
-5. Test entering and leaving combat, especially Dominos and protected frames.
-6. Test profile switching and legacy SavedVariables migration.
-7. Test compatible WeakAuras and Dominos installations.
+1. Open, close, collapse, and resize configuration through `/s2ke`, LDB, and minimap launchers.
+2. Test every inline-tab page at large and small window sizes with one outer scrollbar.
+3. Test empty, single-item, and multi-item variants of every dropdown type and watch for pooled visual leakage.
+4. Test Target, Focus, Friendly, and Enemy nameplate creation, recycling, priority changes, casts, auras, borders, strata, and hitbox clicks.
+5. Test all three preview motion modes while changing Friendly/Enemy hitboxes and horizontal/vertical overlap values.
+6. Test entering and leaving combat with pending CVar, nameplate, media, WeakAuras, and Dominos work.
+7. Test profile switching, copying, deletion, and legacy SavedVariables migration.
+8. Test Chat Copy resizing, geometry persistence, text selection, and auto-scroll.
+9. Test compatible WeakAuras, Dominos, Mapster, and other addons that may provide AceGUI first.
 
 ## Packaging
 
-The release ZIP must contain s2k_Enhancements as its top-level directory and include the TOC, Lua modules, locales and embedded libraries.
+The release archive must contain `s2k_Enhancements` as its top-level directory and include the TOC, Lua modules, locales, documentation, and embedded libraries.
 
-## Constraints
+## Release validation
 
-- Remain compatible with Lua 5.1 and Interface 70300.
-- Do not assume Retail APIs.
-- Do not change SavedVariables without migration.
-- Prefer events over per-frame polling.
-- Do not modify protected frames during combat.
+- Parse every Lua file successfully with a Lua 5.1-compatible parser.
+- Run `git diff --check`.
+- Verify that every file listed by the TOC exists.
+- Confirm the TOC, runtime API, changelog, and this document report the same numeric release version.
+- Do not include build or release suffixes beside the numeric version in the addon window header.

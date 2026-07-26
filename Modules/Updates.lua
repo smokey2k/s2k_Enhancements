@@ -38,7 +38,7 @@ function UpdateHealth(ctx)
 end
 
 function UpdateName(ctx)
-    if not (State.runtimeFlags and State.runtimeFlags.names) then
+    if not (State.runtimeFlags and State.runtimeFlags.names) or not IsNameplateOverlayEnabled(ctx, "ShowNames") then
         ctx.name:SetText("")
         ctx.name:Hide()
         return
@@ -82,7 +82,7 @@ end
 
 function UpdateHPRatio(ctx)
     local text = ctx.ratio
-    if not (State.runtimeFlags and State.runtimeFlags.hpRatio) then
+    if not (State.runtimeFlags and State.runtimeFlags.hpRatio) or not IsNameplateOverlayEnabled(ctx, "ShowHPRatio") then
         text:SetText("")
         text:Hide()
         return
@@ -152,7 +152,7 @@ function UpdateUnitLevelOverlay(ctx)
     local text = ctx and ctx.levelText
     if not text then return end
 
-    if not (State.runtimeFlags and State.runtimeFlags.levelOverlay) or not ctx.root or not ctx.root:IsShown() or not ctx.unit or not UnitExists(ctx.unit) then
+    if not (State.runtimeFlags and State.runtimeFlags.levelOverlay) or not IsNameplateOverlayEnabled(ctx, "ShowLevelOverlay") or not ctx.root or not ctx.root:IsShown() or not ctx.unit or not UnitExists(ctx.unit) then
         text:SetText("")
         text:Hide()
         return
@@ -187,13 +187,13 @@ function UpdateHPThresholdMarker(ctx)
     local marker = ctx and ctx.hpMarker
     if not marker then return end
 
-    if not (State.runtimeFlags and State.runtimeFlags.hpMarker) or not ctx.root or not ctx.root:IsShown() or not ctx.unit or not UnitExists(ctx.unit) then
+    if not (State.runtimeFlags and State.runtimeFlags.hpMarker) or not IsNameplateOverlayEnabled(ctx, "ShowHPMarker") or not ctx.root or not ctx.root:IsShown() or not ctx.unit or not UnitExists(ctx.unit) then
         marker:Hide()
         marker.s2kMarkerPointMode = nil
         return
     end
 
-    if CFG.hpMarkerOnlyTarget and not IsTargetUnit(ctx.unit) then
+    if CFG.hpMarkerOnlyEnemy and not (UnitCanAttack and UnitCanAttack("player", ctx.unit)) then
         marker:Hide()
         marker.s2kMarkerPointMode = nil
         return
@@ -211,8 +211,9 @@ function UpdateHPThresholdMarker(ctx)
     if pct > 100 then pct = 100 end
 
     local anchor = ctx.health or ctx.root
-    local rootW = (anchor.GetWidth and anchor:GetWidth()) or tonumber(CFG.plateWidth) or 110
-    if rootW <= 0 then rootW = tonumber(CFG.plateWidth) or 110 end
+    local fallbackWidth = tonumber(GetNameplateDimensionValue(ctx, "PlateWidth", 110)) or 110
+    local rootW = (anchor.GetWidth and anchor:GetWidth()) or fallbackWidth
+    if rootW <= 0 then rootW = fallbackWidth end
 
     local mode = tostring(CFG.hpMarkerWidthMode or "LINE")
     local p = rootW * (pct / 100)
@@ -246,7 +247,7 @@ function UpdateHPThresholdMarker(ctx)
         if marker.SetWidth then
             marker:SetWidth(width)
         else
-            marker:SetSize(width, math.max(1, tonumber(CFG.plateHeight) or 12))
+            marker:SetSize(width, math.max(1, tonumber(GetNameplateDimensionValue(ctx, "PlateHeight", 12)) or 12))
         end
 
         if pointMode == "LEFT_TO_ZERO" then
@@ -745,10 +746,12 @@ function UpdatePlayerCastOverlaySpark(ctx, value, total)
     end
 
     local width = math.max(1, tonumber(CFG.playerCastOverlaySparkWidth) or 2)
-    local rootW = (ctx.root.GetWidth and ctx.root:GetWidth()) or tonumber(CFG.plateWidth) or 110
-    local rootH = (ctx.root.GetHeight and ctx.root:GetHeight()) or tonumber(CFG.plateHeight) or 12
-    if rootW <= 0 then rootW = tonumber(CFG.plateWidth) or 110 end
-    if rootH <= 0 then rootH = tonumber(CFG.plateHeight) or 12 end
+    local fallbackW = tonumber(GetNameplateDimensionValue(ctx, "PlateWidth", 110)) or 110
+    local fallbackH = tonumber(GetNameplateDimensionValue(ctx, "PlateHeight", 12)) or 12
+    local rootW = (ctx.root.GetWidth and ctx.root:GetWidth()) or fallbackW
+    local rootH = (ctx.root.GetHeight and ctx.root:GetHeight()) or fallbackH
+    if rootW <= 0 then rootW = fallbackW end
+    if rootH <= 0 then rootH = fallbackH end
 
     local ratio = value / total
     if ratio < 0 then ratio = 0 end
@@ -849,7 +852,10 @@ function UpdatePlayerCastOverlay(ctx, knownTarget)
         return
     end
 
-    if not (State.runtimeFlags and State.runtimeFlags.playerCastOverlay) or (not knownTarget and not IsTargetUnit(ctx.unit)) then
+    if not (State.runtimeFlags and State.runtimeFlags.playerCastOverlay)
+    or not CFG.targetPlayerCastOverlayEnabled
+    or (not knownTarget and not IsTargetUnit(ctx.unit))
+    then
         HidePlayerCastOverlay(ctx)
         return
     end
