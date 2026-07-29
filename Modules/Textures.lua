@@ -10,12 +10,17 @@ STATUSBAR_PATH_SETTINGS = {
     { "healthTextureKey", "healthTexturePath" },
     { "castbarTextureKey", "castbarTexturePath" },
     { "playerCastOverlaySparkTextureKey", "playerCastOverlaySparkTexturePath" },
+    { "personalResourceBarTextureKey", "personalResourceBarTexturePath" },
+    { "personalResourceBarBackdropTextureKey", "personalResourceBarBackdropTexturePath" },
+    { "personalClassResourceTextureKey", "personalClassResourceTexturePath" },
+    { "personalClassResourceBackdropTextureKey", "personalClassResourceBackdropTexturePath" },
 }
 
 BORDER_PATH_SETTINGS = {
     {'borderTextureKey', 'borderTexturePath'},
     {'targetBorderTextureKey', 'targetBorderTexturePath'},
     {'castbarBorderTextureKey', 'castbarBorderTexturePath'},
+    {'personalResourceBarBorderTextureKey', 'personalResourceBarBorderTexturePath'},
 }
 
 for _, group in ipairs(NAMEPLATE_DESIGN_GROUPS or {}) do
@@ -114,6 +119,11 @@ end
 function GetConfiguredBorderTexturePath(key, pathKey)
     local option = GetBorderTextureOption(CFG[key], CFG[pathKey])
     return option and option.path or 'Interface\\Buttons\\WHITE8X8'
+end
+
+function GetConfiguredStatusBarTexturePath(key, pathKey)
+    local option = GetStatusBarTextureOption(CFG[key], CFG[pathKey])
+    return option and option.path or CFG[pathKey] or "Interface\\Buttons\\WHITE8X8"
 end
 
 function GetHealthTexturePath(ctx)

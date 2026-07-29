@@ -1326,6 +1326,9 @@ local function FeedOptions(appName, options,container,rootframe,path,group,inlin
 							itemType = nil
 						end
 						control:SetLabel(name)
+						if control.SetMinimumWidthFromLabel then
+							control:SetMinimumWidthFromLabel(v.arg == "S2K_MIN_LABEL_WIDTH")
+						end
 						control:SetList(values, nil, itemType)
 						local value = GetOptionsMemberValue("get",v, options, path, appName)
 						if not values[value] then

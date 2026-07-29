@@ -229,6 +229,7 @@ function ApplyOptionsNow()
     ApplySpellQueueWindowSetting()
     if S2KNP_ApplyModuleState then S2KNP_ApplyModuleState() end
     UpdateAll(true)
+    if ApplyPersonalResourceDisplaySettings then ApplyPersonalResourceDisplaySettings() end
     if refreshFonts or refreshTextures then
         ScheduleVisibleMediaRefreshes(refreshFonts, refreshTextures, true)
     end
@@ -280,6 +281,7 @@ function RequestStatusBarTextureRefresh()
     RememberConfiguredStatusBarTexturePaths()
     RememberConfiguredBorderTexturePaths()
     UpdateAll(true)
+    if ApplyPersonalResourceDisplaySettings then ApplyPersonalResourceDisplaySettings() end
     ScheduleVisibleMediaRefreshes(false, true, true)
 end
 
@@ -324,5 +326,108 @@ function RequestColorRefresh(settingPrefix)
         if ApplyChatSettings then ApplyChatSettings() end
     else
         UpdateAll(true)
+        if tostring(settingPrefix or ""):match("^personalResource")
+        or tostring(settingPrefix or ""):match("^personalClassResource") then
+            if ApplyPersonalResourceDisplaySettings then ApplyPersonalResourceDisplaySettings() end
+        end
     end
+end
+
+local HEALTHBAR_TO_PROGRESS_STYLE = {
+    HealthTextureKey = "TextureKey", HealthTexturePath = "TexturePath",
+    HealthColorR = "ColorR", HealthColorG = "ColorG", HealthColorB = "ColorB", HealthColorA = "ColorA",
+    HealthBackdropTextureKey = "BackdropTextureKey", HealthBackdropTexturePath = "BackdropTexturePath",
+    HealthBackdropColorR = "BackdropColorR", HealthBackdropColorG = "BackdropColorG",
+    HealthBackdropColorB = "BackdropColorB", HealthBackdropColorA = "BackdropColorA",
+    BorderTextureKey = "BorderTextureKey", BorderTexturePath = "BorderTexturePath",
+    BorderSize = "BorderSize", BorderInset = "BorderInset", BorderOffset = "BorderOffset",
+    BorderFrameLevel = "BorderFrameLevel",
+    BorderColorR = "BorderColorR", BorderColorG = "BorderColorG",
+    BorderColorB = "BorderColorB", BorderColorA = "BorderColorA",
+}
+
+local function CopyHealthbarStyleToProgressBar(sourceGroup, targetPrefix)
+    local valid = {}
+    for _, group in ipairs(NAMEPLATE_DESIGN_GROUPS or {}) do valid[group] = true end
+    sourceGroup, targetPrefix = tostring(sourceGroup or ""), tostring(targetPrefix or "")
+    if not valid[sourceGroup] or (targetPrefix ~= "castbar" and targetPrefix ~= "personalResourceBar") then
+        return false
+    end
+    for sourceSuffix, targetSuffix in pairs(HEALTHBAR_TO_PROGRESS_STYLE) do
+        local value = DB[sourceGroup .. sourceSuffix]
+        if value == nil then value = CFG[sourceGroup .. sourceSuffix] end
+        DB[targetPrefix .. targetSuffix] = CopySavedValue(value)
+        CFG[targetPrefix .. targetSuffix] = CopySavedValue(value)
+    end
+    if RequestStatusBarTextureRefresh then RequestStatusBarTextureRefresh()
+    elseif RequestApply then RequestApply() end
+    if SyncProgressBarControls then SyncProgressBarControls(targetPrefix) end
+    return true
+end
+
+function CopyHealthbarStyleToCastbar(sourceGroup)
+    return CopyHealthbarStyleToProgressBar(sourceGroup, "castbar")
+end
+
+function CopyHealthbarStyleToPersonalResourceBar(sourceGroup)
+    return CopyHealthbarStyleToProgressBar(sourceGroup, "personalResourceBar")
+end
+
+local NAMEPLATE_DESIGN_COPY_SUFFIXES = {
+    "HealthTextureKey", "HealthTexturePath", "HealthUseReactionColor",
+    "HealthColorR", "HealthColorG", "HealthColorB", "HealthColorA",
+    "HealthBackdropTextureKey", "HealthBackdropTexturePath",
+    "HealthBackdropColorR", "HealthBackdropColorG", "HealthBackdropColorB", "HealthBackdropColorA",
+    "BorderTextureKey", "BorderTexturePath", "BorderSize", "BorderInset", "BorderOffset", "BorderFrameLevel",
+    "BorderColorR", "BorderColorG", "BorderColorB", "BorderColorA",
+    "ShowNames", "ShowHPRatio", "ShowLevelOverlay", "ShowHPMarker", "ShowBuffs", "ShowDebuffs",
+    "CastbarAnchorTo", "CastbarAnchorSide", "BuffAnchorTo", "DebuffAnchorTo", "BuffAnchorSide", "DebuffAnchorSide",
+    "HPMarkerColorR", "HPMarkerColorG", "HPMarkerColorB", "HPMarkerColorA",
+}
+
+function CopyNameplateDesignGroup(targetGroup, sourceGroup)
+    local valid = {}
+    for _, group in ipairs(NAMEPLATE_DESIGN_GROUPS or {}) do valid[group] = true end
+    targetGroup, sourceGroup = tostring(targetGroup or ""), tostring(sourceGroup or "")
+    if targetGroup == sourceGroup or not valid[targetGroup] or not valid[sourceGroup] then return false end
+
+    for _, suffix in ipairs(NAMEPLATE_DESIGN_COPY_SUFFIXES) do
+        local value = DB[sourceGroup .. suffix]
+        if value == nil then value = CFG[sourceGroup .. suffix] end
+        if targetGroup ~= "personal" and (suffix == "CastbarAnchorTo" or suffix == "BuffAnchorTo" or suffix == "DebuffAnchorTo")
+        and (value == "PERSONAL_RESOURCE" or value == "PERSONAL_CLASS_RESOURCE") then
+            value = "HEALTH"
+        end
+        DB[targetGroup .. suffix] = CopySavedValue(value)
+        CFG[targetGroup .. suffix] = CopySavedValue(value)
+    end
+
+    -- targetPlayerCastOverlayEnabled and the shared playerCastOverlay* settings
+    -- are intentionally not group-prefixed and never participate in this copy.
+    if RequestStatusBarTextureRefresh then RequestStatusBarTextureRefresh()
+    elseif UpdateNameplatePreview then UpdateNameplatePreview() end
+    if SyncNameplateDesignControls then SyncNameplateDesignControls(targetGroup) end
+    return true
+end
+
+local NAMEPLATE_DIMENSION_COPY_SUFFIXES = {
+    "PlateWidth", "PlateHeight", "NameplateHitboxWidth", "NameplateHitboxHeight",
+    "HealthbarHitboxXOffset", "HealthbarHitboxYOffset", "HealthbarFrameStrata",
+}
+
+function CopyNameplateDimensionGroup(targetGroup, sourceGroup)
+    local valid = {}
+    for _, group in ipairs(NAMEPLATE_DIMENSION_GROUPS or {}) do valid[group] = true end
+    targetGroup, sourceGroup = tostring(targetGroup or ""), tostring(sourceGroup or "")
+    if targetGroup == sourceGroup or not valid[targetGroup] or not valid[sourceGroup] then return false end
+
+    for _, suffix in ipairs(NAMEPLATE_DIMENSION_COPY_SUFFIXES) do
+        local value = DB[sourceGroup .. suffix]
+        if value == nil then value = CFG[sourceGroup .. suffix] end
+        DB[targetGroup .. suffix] = CopySavedValue(value)
+        CFG[targetGroup .. suffix] = CopySavedValue(value)
+    end
+    if RequestApply then RequestApply() end
+    if SyncNameplateDimensionControls then SyncNameplateDimensionControls(targetGroup) end
+    return true
 end

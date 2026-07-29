@@ -101,6 +101,9 @@ function S2KNP_OnEvent(self, event, arg1)
             UpdateAll(false)
             ScheduleNameplateScaleStabilization()
         end
+        if State.pendingPersonalResourceApply and ApplyPersonalResourceDisplaySettings then
+            ApplyPersonalResourceDisplaySettings()
+        end
         return
     end
 
@@ -138,6 +141,7 @@ function S2KNP_OnEvent(self, event, arg1)
         S2KNP_ApplyModuleState()
         SyncProfilerState()
         if ScheduleDominosIntegrationApply then ScheduleDominosIntegrationApply() end
+        if ApplyPersonalResourceDisplaySettings then ApplyPersonalResourceDisplaySettings() end
         return
     end
 
@@ -154,14 +158,42 @@ function S2KNP_OnEvent(self, event, arg1)
         DelayedRefreshVisibleMedia()
         if ApplyChatSettings then ApplyChatSettings() end
         if ScheduleDominosIntegrationApply then ScheduleDominosIntegrationApply() end
+        if ApplyPersonalResourceDisplaySettings then ApplyPersonalResourceDisplaySettings() end
         return
     end
 
     if event == "NAME_PLATE_UNIT_ADDED" then
         ClearTargetContextCache()
         UpdateUnit(arg1, true)
+        if GetNameplateDimensionGroup(arg1) == "personal" and ApplyPersonalResourceDisplaySettings then
+            ApplyPersonalResourceDisplaySettings()
+        end
         ScheduleNameplateScaleStabilization()
         RefreshWeakAurasRuntime(false)
+        return
+    end
+
+    if event == "PLAYER_SPECIALIZATION_CHANGED" or event == "UNIT_DISPLAYPOWER" then
+        if (not arg1 or arg1 == "player") and ApplyPersonalResourceDisplaySettings then
+            ApplyPersonalResourceDisplaySettings()
+        end
+        return
+    end
+
+    if event == "UNIT_POWER_FREQUENT" or event == "UNIT_POWER" or event == "UNIT_MAXPOWER" then
+        if arg1 == "player" and RefreshPersonalResourcePowerValue then
+            RefreshPersonalResourcePowerValue()
+        end
+        if arg1 == "player" and RefreshPersonalClassResourceValue then
+            RefreshPersonalClassResourceValue()
+        end
+        return
+    end
+
+    if event == "RUNE_POWER_UPDATE" or event == "RUNE_TYPE_UPDATE" then
+        if RefreshPersonalClassResourceValue then
+            RefreshPersonalClassResourceValue()
+        end
         return
     end
 

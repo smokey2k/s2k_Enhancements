@@ -66,7 +66,12 @@ local function TextWidths(widget,list)
  local measure=widget.s2kMeasureText
  for _,value in pairs(list or {}) do local _,label=Parse(value);measure:SetText(label);widest=math.max(widest,measure:GetStringWidth() or 0) end
  local _,height=measure:GetFont();local charWidth=math.max(6,math.ceil((tonumber(height) or 12)*0.6))
- return math.ceil(widest+50+charWidth*4),math.ceil(widest+22+charWidth*4)
+ local headerWidth=math.ceil(widest+50+charWidth*4)
+ if widget.s2kMinimumWidthFromLabel then
+  measure:SetText(widget.label:GetText() or "")
+  headerWidth=math.max(headerWidth,math.ceil((measure:GetStringWidth() or 0)+10))
+ end
+ return headerWidth,math.ceil(widest+22+charWidth*4)
 end
 	
 	--[[ Static data ]]--
@@ -176,6 +181,7 @@ end
 		SetPulloutBorder(self, nil)
 		
 		self:SetHeight(44)
+		self.s2kMinimumWidthFromLabel = nil
 		self.s2kDesiredWidth = self.s2kMode == "text" and 120 or 180
 		self:SetWidth(self.s2kDesiredWidth)
 		self:SetPulloutWidth(self.s2kDesiredWidth)
@@ -205,6 +211,7 @@ end
 		self.open = nil
 		self.hasClose = nil
 		self.s2kBorderColorPrefix = nil
+		self.s2kMinimumWidthFromLabel = nil
 		
 		self.frame:ClearAllPoints()
 		self.frame:Hide()
@@ -266,6 +273,10 @@ end
 			self:SetHeight(26)
 			self.alignoffset = 12
 		end
+	end
+
+	local function SetMinimumWidthFromLabel(self, enabled)
+		self.s2kMinimumWidthFromLabel = enabled and true or nil
 	end
 	
 	-- exported
@@ -433,6 +444,7 @@ local sortlist = {}
 		self.GetValue    = GetValue
 		self.SetList     = SetList
 		self.SetLabel    = SetLabel
+		self.SetMinimumWidthFromLabel = SetMinimumWidthFromLabel
 		self.SetDisabled = SetDisabled
 		self.AddItem     = AddItem
 		self.SetMultiselect = SetMultiselect

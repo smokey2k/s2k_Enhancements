@@ -1,3 +1,36 @@
+# s2k:Enhancements 1.33.0
+
+- Stabilized the Personal Resource Bar with an addon-owned, event-driven status bar that Blizzard target and power scripts cannot hide or reposition.
+- Made the Personal Resource Bar visible only while its current power value is greater than zero, with dependent layout nodes collapsing when it becomes empty.
+- Replaced all Blizzard Personal Resource Display resource frames with addon-owned power and class-resource frames driven only by Legion unit-power and rune events.
+- Removed the direct Blizzard nameplate-driver refresh call and Personal UnitFrame mutation that could taint Legion's protected `SetTargetClampingInsets` path.
+- Made the Castbar width optional; when custom width is disabled, the Castbar always follows its nameplate Healthbar width.
+- Added versioned, checksummed Custom Nameplates import/export strings and reusable import/export dialogs.
+- Added a saved Custom Nameplates configuration selector; imported configurations activate immediately, and later selections apply only nameplate-related settings.
+- Added an editable configuration name to the export dialog; that name is stored in the export string and used by the imported-config selector.
+- Added a non-deletable, enabled Blizzard-like Default preset and a Delete current config action that activates Default after removing the selected imported preset.
+- Made the Custom Nameplates config dropdown at least as wide as its label through the shared opt-in dropdown sizing path.
+- Fixed the layout preview to honor buff/debuff maximum icon counts, icons per row or column, and target-frame visibility immediately.
+- Added Copy from selectors to Target, Focus, Friendly and Enemy Healthbar design tabs; group visuals and overlay switches copy without touching the Target-only player-cast overlay.
+- Added a manual Player cast overlay inset independent of border geometry and a configurable Healthbar border frame level for every design group.
+- Reordered the Healthbar design tabs into color, texture, border-geometry and overlay sections, and moved HP-threshold marker colors into the Overlays marker tab.
+- Kept the Healthbar design colors on a dedicated row below Copy from and added a manual HP-threshold marker inset that does not alter its true health percentage position.
+- Added independent Personal Resource Display dimensions, hitbox, offsets, frame strata, design, overlays and Copy from support.
+- Added Dimensions Copy from selectors, configurable personal power/class-resource frames, and castbar aura anchors that fall back to the healthbar while no cast is active.
+- Added Personal resource/class-resource samples to the preview and moved buff/debuff visibility into per-design Auras groups for Target, Focus, Personal, Friendly and Enemy.
+- Moved Buff and Debuff anchor-side selection into the per-design Auras groups with migration and Copy from support.
+- Moved Buff and Debuff anchor-target selection into the per-design Auras groups with group-local cycle protection, migration and Copy from support.
+- Renamed the Castbar page to Progress bars and moved both Personal Resource Display configuration groups below the Castbar settings.
+- Added per-design Progress bars groups with top/bottom anchors and collapsible aura anchor targets for Castbar and both Personal Resource Display bars.
+- Reworked healthbar attachments into an acyclic per-design parent hierarchy so Castbar, Personal resources, Buffs and Debuffs collapse recursively toward the healthbar when dynamic ancestors disappear.
+- Added complete color, texture, backdrop and border styling for the Personal resource bar, plus per-segment color, texture, backdrop, spacing and optional fixed 1-pixel borders for Personal class resources.
+- Added independent Castbar width and border frame level, a Personal resource border frame level, and stateless Copy from selectors that copy compatible Healthbar visual styles into either progress bar.
+- Added authoritative Legion 7.3.5 Personal Resource Display visibility CVars with full self alpha while the addon setting is enabled.
+- Corrected older-profile initialization and apply the Personal Resource Display visibility modes as Always=1, InCombat=0 and WithTarget=0.
+- Kept Nameplates preview updates on the existing targeted refresh paths and synchronized copied Healthbar design controls directly without rebuilding or shifting the AceConfig page.
+- Changed same-name Custom Nameplates imports to overwrite the existing preset, hid Export after generating the string, and corrected the full Import/Export action-button hit rectangle.
+- Turned every Healthbar Copy from dropdown into a stateless action selector that clears its header and all pullout checkmarks immediately after copying.
+
 # s2k:Enhancements 1.32.0
 
 - Made the nameplate preview honor `nameplateMotion`: Overlapping shares one anchor, Stacking forms a hitbox/vertical-overlap-based column, and Spread uses the 2x2 horizontal/vertical collision matrix.

@@ -41,6 +41,40 @@ function CreateBorder(parent)
     return border
 end
 
+function CreatePersonalResourceStatusBar(parent)
+    local bar = CreateFrame("StatusBar", nil, parent)
+    bar:SetMinMaxValues(0, 1)
+    bar:SetValue(0)
+    bar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
+    bar.bg = bar:CreateTexture(nil, "BACKGROUND")
+    bar.bg:SetAllPoints(bar)
+    bar.bg:SetColorTexture(0, 0, 0, .7)
+    bar.border = CreateBorder(bar)
+    bar.s2kManagedBackdrop = bar.bg
+    bar.s2kManagedBorder = bar.border
+    bar.s2kAddonOwnedPersonalResource = true
+    return bar
+end
+
+function CreatePersonalClassResourceFrame(parent, segmentCount)
+    local frame = CreateFrame("Frame", nil, parent)
+    frame.points = {}
+    for index = 1, (tonumber(segmentCount) or 6) do
+        local point = CreateFrame("Frame", nil, frame)
+        point.bg = point:CreateTexture(nil, "BACKGROUND")
+        point.bg:SetAllPoints(point)
+        point.fill = point:CreateTexture(nil, "ARTWORK")
+        point.fill:SetAllPoints(point)
+        point.s2kManagedBackdrop = point.bg
+        point.s2kManagedFill = point.fill
+        point.s2kManagedBorder = CreateBorder(point)
+        point.s2kManagedBorder.s2kPersonalResourceDecoration = true
+        frame.points[index] = point
+    end
+    frame.s2kAddonOwnedPersonalResource = true
+    return frame
+end
+
 function ApplyBorderVisual(border, textureKey, texturePath, size, inset, offset, r, g, b, a)
     if not border then
         return
@@ -108,11 +142,10 @@ function SyncCustomFrameLevels(ctx)
     end
 
     if ctx.castBorder and ctx.castBorder.SetFrameLevel then
-        ctx.castBorder:SetFrameLevel(base + 5)
+        ctx.castBorder:SetFrameLevel(base + (tonumber(CFG.castbarBorderFrameLevel) or 5))
     end
 
-    -- Player cast overlay is drawn over the custom healthbar, but below
-    -- HP ratio/name/aura layers. The healthbar border stays above the overlay.
+    -- Player cast overlay is drawn over the custom healthbar.
     local overlayFrameLevel = tonumber(CFG.playerCastOverlayFrameLevel) or 20
     if ctx.playerCastOverlay and ctx.playerCastOverlay.SetFrameLevel then
         ctx.playerCastOverlay:SetFrameLevel(base + overlayFrameLevel)
@@ -137,12 +170,10 @@ function SyncCustomFrameLevels(ctx)
         ctx.castText:SetDrawLayer("OVERLAY", 7)
     end
 
-    -- Keep the border immediately above its own StatusBar. A large offset here
-    -- lets one UIParent-parented nameplate border interleave with the healthbar
-    -- of another nameplate, which looks like a translucent border bleeding
-    -- through stacked plates.
     if ctx.border and ctx.border.SetFrameLevel then
-        ctx.border:SetFrameLevel(base + 3)
+        local group = GetNameplateDesignGroup(ctx.unit)
+        if ctx.designGroup then group = ctx.designGroup end
+        ctx.border:SetFrameLevel(base + (tonumber(CFG[group .. "BorderFrameLevel"]) or 3))
     end
 
     -- Text layers must be above both the StatusBar and the border.
@@ -228,7 +259,7 @@ function SyncCustomNameplateFrameOrder()
             local bLevel = GetBlizzardNameplateOrder(b)
             if aLevel ~= bLevel then return aLevel < bLevel end
 
-            local priorities = { friendly = 1, enemy = 1, focus = 2, target = 3 }
+            local priorities = { personal = 1, friendly = 1, enemy = 1, focus = 2, target = 3 }
             local aPriority = priorities[GetNameplateDesignGroup(a.unit)] or 1
             local bPriority = priorities[GetNameplateDesignGroup(b.unit)] or 1
             if aPriority ~= bPriority then return aPriority < bPriority end
@@ -441,6 +472,8 @@ function ResetNameplateContextVisuals(ctx, resetScale)
     if HideCastbar then HideCastbar(ctx) end
     if HidePlayerCastOverlay then HidePlayerCastOverlay(ctx) end
     if ctx.hpMarker then ctx.hpMarker:Hide() end
+    if ctx.s2kPersonalResourceBar then ctx.s2kPersonalResourceBar:Hide() end
+    if ctx.s2kPersonalClassResource then ctx.s2kPersonalClassResource:Hide() end
     if HideWAAnchors then HideWAAnchors(ctx) end
 
     ctx.s2kLastHealthMax = nil
@@ -583,7 +616,8 @@ local function NewPreviewAura(parent, icon)
 end
 
 local function NewPreviewPlate(parent, group)
-    local p = {designGroup=group, dimensionGroup=group == "friendly" and "friendly" or "enemy", isTarget=group == "target"}
+    local dimensionGroup = group == "personal" and "personal" or group == "friendly" and "friendly" or "enemy"
+    local p = {designGroup=group, dimensionGroup=dimensionGroup, isTarget=group == "target"}
     p.hitbox = CreateFrame("Frame", nil, parent)
     p.hitbox.bg = p.hitbox:CreateTexture(nil,"BACKGROUND"); p.hitbox.bg:SetAllPoints(); p.hitbox.bg:SetColorTexture(1,.82,.05,.13)
     p.hitboxBorder = CreateBorder(p.hitbox)
@@ -594,8 +628,114 @@ local function NewPreviewPlate(parent, group)
     p.levelText:SetText(p.isTarget and "110+" or "110"); p.ratio:SetText(p.isTarget and "291.2" or "84.6")
     p.cast:SetValue(p.isTarget and .68 or .42); p.cast:Show(); p.castBorder:Show(); p.castText:SetText(S2K_L("Spell cast")); p.castText:Show()
     p.castIconFrame.icon:SetTexture(PREVIEW_ICONS[4]); p.castIconFrame:Show()
+    if group=="personal" then
+        p.personalResourceBar=CreatePersonalResourceStatusBar(p.hitbox)
+        p.personalResourceBar:SetFrameLevel(160)
+        p.personalResourceBar:SetValue(.72)
+        p.personalResourceBar:SetStatusBarColor(.15,.45,1,1)
+        p.personalClassResource=CreatePersonalClassResourceFrame(p.hitbox,5);p.personalClassResource:SetFrameLevel(160)
+        for _,point in ipairs(p.personalClassResource.points)do point.border=point.s2kManagedBorder end
+    end
     for i=1,4 do p.buffFrame.buttons[i]=NewPreviewAura(p.buffFrame,PREVIEW_ICONS[i]); p.debuffFrame.buttons[i]=NewPreviewAura(p.debuffFrame,PREVIEW_ICONS[5-i]) end
     return p
+end
+
+local function EnsurePreviewAuraButtons(frame, count, kind)
+    count = math.max(1, math.min(40, tonumber(count) or 1))
+    while #frame.buttons < count do
+        local index = #frame.buttons + 1
+        local iconIndex = kind == "BUFF" and ((index - 1) % #PREVIEW_ICONS) + 1
+            or (#PREVIEW_ICONS - ((index - 1) % #PREVIEW_ICONS))
+        frame.buttons[index] = NewPreviewAura(frame, PREVIEW_ICONS[iconIndex])
+    end
+end
+
+local function UpdatePreviewAuraFrame(p, kind)
+    local isBuff = kind == "BUFF"
+    local frame = isBuff and p.buffFrame or p.debuffFrame
+    local maxIcons = math.max(1, math.min(40, tonumber(isBuff and CFG.buffMaxIcons or CFG.debuffMaxIcons) or 8))
+    local enabled = isBuff and CFG.buffFrameEnabled or CFG.debuffFrameEnabled
+    local showForDesign = CFG[p.designGroup .. (isBuff and "ShowBuffs" or "ShowDebuffs")] ~= false
+
+    EnsurePreviewAuraButtons(frame, maxIcons, kind)
+    PositionAuraFrame(p, kind, maxIcons)
+    PositionAuraButtons(frame, kind, maxIcons)
+    for index, button in ipairs(frame.buttons) do
+        if enabled and showForDesign and index <= maxIcons then
+            button:Show()
+        else
+            button:Hide()
+        end
+    end
+    if enabled and showForDesign then frame:Show() else frame:Hide() end
+end
+
+local function UpdatePreviewPersonalResources(p)
+    if not p.personalResourceBar or not p.personalClassResource then return end
+    local resource=p.personalResourceBar
+    if CFG.personalResourceBarEnabled then resource:Show() else resource:Hide() end
+    local class=p.personalClassResource
+    if CFG.personalClassResourceEnabled then class:Show() else class:Hide() end
+
+    resource:ClearAllPoints()
+    local resourceAnchor=ResolveLayoutNodeAnchor(p,"PERSONAL_RESOURCE")
+    local resourceSide=GetLayoutNodeSide(p,"PERSONAL_RESOURCE")
+    local resourceOffset=GetEffectiveLayoutNodeOffset(p,"PERSONAL_RESOURCE")
+    if resourceSide=="TOP" then resource:SetPoint("BOTTOM",resourceAnchor,"TOP",tonumber(CFG.personalResourceBarXOffset) or 0,resourceOffset)
+    else resource:SetPoint("TOP",resourceAnchor,"BOTTOM",tonumber(CFG.personalResourceBarXOffset) or 0,resourceOffset) end
+    resource:SetSize(math.max(1,tonumber(CFG.personalResourceBarWidth) or 110),math.max(1,tonumber(CFG.personalResourceBarHeight) or 8))
+    if resource.SetFrameStrata then resource:SetFrameStrata(tostring(CFG.personalResourceBarFrameStrata or "HIGH")) end
+    ApplyStatusBarTexture(resource,GetConfiguredStatusBarTexturePath("personalResourceBarTextureKey","personalResourceBarTexturePath"))
+    resource:SetStatusBarColor(GetCustomColor("personalResourceBarColor",.15,.45,1,1))
+    ApplyStatusBarBackdropTexture(resource.bg,
+        GetConfiguredStatusBarTexturePath("personalResourceBarBackdropTextureKey","personalResourceBarBackdropTexturePath"),
+        GetCustomColor("personalResourceBarBackdropColor",0,0,0,.7))
+    ApplyBorderVisual(resource.border,CFG.personalResourceBarBorderTextureKey,
+        GetConfiguredBorderTexturePath("personalResourceBarBorderTextureKey","personalResourceBarBorderTexturePath"),
+        CFG.personalResourceBarBorderSize,CFG.personalResourceBarBorderInset,CFG.personalResourceBarBorderOffset,
+        GetCustomColor("personalResourceBarBorderColor",0,0,0,1))
+    if resource.border.SetFrameLevel then
+        resource.border:SetFrameLevel((resource:GetFrameLevel() or 0)
+            +(tonumber(CFG.personalResourceBarBorderFrameLevel) or 5))
+    end
+
+    local width=math.max(1,tonumber(CFG.personalClassResourceWidth) or 110)
+    local height=math.max(1,tonumber(CFG.personalClassResourceHeight) or 10)
+    class:ClearAllPoints()
+    local classAnchor=ResolveLayoutNodeAnchor(p,"PERSONAL_CLASS_RESOURCE")
+    local classSide=GetLayoutNodeSide(p,"PERSONAL_CLASS_RESOURCE")
+    local classOffset=GetEffectiveLayoutNodeOffset(p,"PERSONAL_CLASS_RESOURCE")
+    if classSide=="TOP" then class:SetPoint("BOTTOM",classAnchor,"TOP",tonumber(CFG.personalClassResourceXOffset) or 0,classOffset)
+    else class:SetPoint("TOP",classAnchor,"BOTTOM",tonumber(CFG.personalClassResourceXOffset) or 0,classOffset) end
+    class:SetSize(width,height)
+    local gap=math.max(0,tonumber(CFG.personalClassResourceSpacing) or 0)
+    local pointWidth=math.max(1,(width-gap*4)/5)
+    for index,point in ipairs(class.points)do
+        point:ClearAllPoints();point:SetPoint("TOPLEFT",class,"TOPLEFT",(index-1)*(pointWidth+gap),0);point:SetSize(pointWidth,height)
+        ApplyTexturePath(point.fill,GetConfiguredStatusBarTexturePath("personalClassResourceTextureKey","personalClassResourceTexturePath"))
+        point.fill:SetVertexColor(GetCustomColor("personalClassResourceColor",1,.72,.08,1))
+        ApplyStatusBarBackdropTexture(point.bg,
+            GetConfiguredStatusBarTexturePath("personalClassResourceBackdropTextureKey","personalClassResourceBackdropTexturePath"),
+            GetCustomColor("personalClassResourceBackdropColor",0,0,0,.7))
+        if CFG.personalClassResourceBorderEnabled then
+            ApplyBorderVisual(point.border,"S2K_SOLID","Interface\\Buttons\\WHITE8X8",1,0,0,
+                GetCustomColor("personalClassResourceBorderColor",0,0,0,1))
+        else
+            point.border:Hide()
+        end
+    end
+end
+
+local function UpdatePreviewAuraFrames(p)
+    local buffAnchorTo=GetConfiguredAuraAnchorTarget(p,"BUFF")
+    local debuffAnchorTo=GetConfiguredAuraAnchorTarget(p,"DEBUFF")
+    if debuffAnchorTo == "BUFF" and buffAnchorTo ~= "DEBUFF" then
+        UpdatePreviewAuraFrame(p, "BUFF")
+        UpdatePreviewAuraFrame(p, "DEBUFF")
+    else
+        UpdatePreviewAuraFrame(p, "DEBUFF")
+        UpdatePreviewAuraFrame(p, "BUFF")
+    end
 end
 
 function RecreateNameplatePreviewTextObjects(settingKey)
@@ -626,11 +766,12 @@ end
 local function PreviewMarker(p,w)
     local group=p.designGroup
     if not CFG[group.."ShowHPMarker"] or (CFG.hpMarkerOnlyEnemy and p.dimensionGroup~="enemy") then p.hpMarker:Hide(); return end
+    local h=p.health:GetHeight() or 1;local inset=math.max(0,tonumber(CFG.hpMarkerInset) or 0);inset=math.min(inset,math.max(0,math.min(w,h)/2-.5))
     local pct=math.max(0,math.min(100,tonumber(CFG.hpMarkerPercent) or 35)); local pos=w*pct/100; local mode=tostring(CFG.hpMarkerWidthMode or "LINE")
     p.hpMarker:ClearAllPoints()
-    if mode=="LEFT_TO_ZERO" then p.hpMarker:SetPoint("TOPLEFT",p.health,"TOPLEFT"); p.hpMarker:SetPoint("BOTTOMLEFT",p.health,"BOTTOMLEFT"); p.hpMarker:SetWidth(math.max(1,pos))
-    elseif mode=="RIGHT_TO_END" then p.hpMarker:SetPoint("TOPLEFT",p.health,"TOPLEFT",pos,0); p.hpMarker:SetPoint("BOTTOMLEFT",p.health,"BOTTOMLEFT",pos,0); p.hpMarker:SetWidth(math.max(1,w-pos))
-    else p.hpMarker:SetPoint("TOP",p.health,"TOP",pos-w/2,0); p.hpMarker:SetPoint("BOTTOM",p.health,"BOTTOM",pos-w/2,0); p.hpMarker:SetWidth(math.max(1,tonumber(CFG.hpMarkerWidth) or 2)) end
+    if mode=="LEFT_TO_ZERO" then p.hpMarker:SetPoint("TOPLEFT",p.health,"TOPLEFT",inset,-inset); p.hpMarker:SetPoint("BOTTOMLEFT",p.health,"BOTTOMLEFT",inset,inset); p.hpMarker:SetWidth(math.max(1,pos-inset))
+    elseif mode=="RIGHT_TO_END" then p.hpMarker:SetPoint("TOPLEFT",p.health,"TOPLEFT",pos,-inset); p.hpMarker:SetPoint("BOTTOMLEFT",p.health,"BOTTOMLEFT",pos,inset); p.hpMarker:SetWidth(math.max(1,w-inset-pos))
+    else p.hpMarker:SetPoint("TOP",p.health,"TOP",pos-w/2,-inset); p.hpMarker:SetPoint("BOTTOM",p.health,"BOTTOM",pos-w/2,inset); p.hpMarker:SetWidth(math.max(1,tonumber(CFG.hpMarkerWidth) or 2)) end
     local r,g,b,a=GetCustomColor(group.."HPMarkerColor",1,1,1,1); if CFG.hpMarkerUseBorderColor then r,g,b=GetCustomColor(group.."BorderColor",0,0,0,1) end
     p.hpMarker.texture:SetColorTexture(r,g,b,a); p.hpMarker:Show()
 end
@@ -648,14 +789,20 @@ local function UpdatePreviewPlate(p,x,y,scale)
     local tk,tp=group.."BorderTextureKey",group.."BorderTexturePath"
     br,bg,bb,ba=GetCustomColor(group.."BorderColor",0,0,0,1)
     ApplyBorderVisual(p.border,CFG[tk],GetConfiguredBorderTexturePath(tk,tp),CFG[group.."BorderSize"],CFG[group.."BorderInset"],CFG[group.."BorderOffset"],br,bg,bb,ba)
-    ApplyStatusBarTexture(p.playerCastOverlay,PreviewTexture(group,false)); p.playerCastOverlay:SetStatusBarColor(GetPlayerCastOverlayColor()); if p.isTarget and CFG.targetPlayerCastOverlayEnabled then p.playerCastOverlay:Show() else p.playerCastOverlay:Hide() end
-    p.playerCastOverlaySpark:ClearAllPoints(); p.playerCastOverlaySpark:SetPoint("CENTER",p.root,"LEFT",w*.56,0); p.playerCastOverlaySpark:SetSize(tonumber(CFG.playerCastOverlaySparkWidth) or 2,h); ApplyTexturePath(p.playerCastOverlaySpark.texture,GetPlayerCastOverlaySparkTexturePath()); p.playerCastOverlaySpark.texture:SetVertexColor(GetPlayerCastOverlaySparkColor()); if p.isTarget and CFG.targetPlayerCastOverlayEnabled and CFG.playerCastOverlaySparkEnabled then p.playerCastOverlaySpark:Show() else p.playerCastOverlaySpark:Hide() end
+    if PositionPlayerCastOverlay then PositionPlayerCastOverlay(p) end; ApplyStatusBarTexture(p.playerCastOverlay,PreviewTexture(group,false)); p.playerCastOverlay:SetStatusBarColor(GetPlayerCastOverlayColor()); if p.isTarget and CFG.targetPlayerCastOverlayEnabled then p.playerCastOverlay:Show() else p.playerCastOverlay:Hide() end
+    local overlayW=p.playerCastOverlay:GetWidth() or w;local overlayH=p.playerCastOverlay:GetHeight() or h;p.playerCastOverlaySpark:ClearAllPoints(); p.playerCastOverlaySpark:SetPoint("CENTER",p.playerCastOverlay,"LEFT",overlayW*.56,0); p.playerCastOverlaySpark:SetSize(tonumber(CFG.playerCastOverlaySparkWidth) or 2,math.max(1,overlayH)); ApplyTexturePath(p.playerCastOverlaySpark.texture,GetPlayerCastOverlaySparkTexturePath()); p.playerCastOverlaySpark.texture:SetVertexColor(GetPlayerCastOverlaySparkColor()); if p.isTarget and CFG.targetPlayerCastOverlayEnabled and CFG.playerCastOverlaySparkEnabled then p.playerCastOverlaySpark:Show() else p.playerCastOverlaySpark:Hide() end
     PreviewMarker(p,w)
     p.ratio:ClearAllPoints(); p.ratio:SetPoint("CENTER",p.ratioLayer,"CENTER",0,tonumber(CFG.hpRatioYOffset) or 0); ApplyFontStringFont(p.ratio,CFG.hpRatioFontKey,CFG.hpRatioFontSize,CFG.hpRatioFontOutlineKey,CFG.hpRatioFontPath); p.ratio:SetTextColor(GetHPRatioColor()); if CFG[group.."ShowHPRatio"] then p.ratio:Show() else p.ratio:Hide() end
     p.name:SetText(S2K_L(group:gsub("^%l",string.upper).." nameplate")); p.name:ClearAllPoints(); p.name:SetPoint("BOTTOM",p.root,"TOP",0,tonumber(CFG.nameYOffset) or 4); ApplyFontStringFont(p.name,CFG.nameFontKey,CFG.nameFontSize,CFG.nameFontOutlineKey,CFG.nameFontPath); if CFG[group.."ShowNames"] then p.name:Show() else p.name:Hide() end
     ApplyFontStringFont(p.levelText,CFG.levelOverlayFontKey,CFG.levelOverlayFontSize,CFG.levelOverlayFontOutlineKey,CFG.levelOverlayFontPath); p.levelText:SetTextColor(GetLevelOverlayColor()); ApplyLevelOverlayAnchor(p.levelText,p.levelLayer,CFG.levelOverlayXOffset or 0,CFG.levelOverlayYOffset or 16); if CFG[group.."ShowLevelOverlay"] then p.levelText:Show() else p.levelText:Hide() end
     ApplyFontStringFont(p.castText,CFG.castbarSpellNameFontKey,CFG.castbarSpellNameFontSize,CFG.castbarSpellNameFontOutlineKey,CFG.castbarSpellNameFontPath); p.castText:SetTextColor(GetCastbarSpellNameColor()); ApplyStatusBarTexture(p.cast,GetCastbarTexturePath()); ApplyStatusBarBackdropTexture(p.cast.bg,GetCastbarBackdropTexturePath(),GetCastbarBackdropColor()); p.cast:SetStatusBarColor(GetCastbarColor()); PositionCastbar(p); if CFG.showCastbar then p.cast:Show() else p.cast:Hide() end; if CFG.showCastbar and CFG.showCastbarSpellName then p.castText:Show() else p.castText:Hide() end; if CFG.showCastbar and CFG.showCastbarIcon then p.castIconFrame:Show() else p.castIconFrame:Hide() end
-    PositionAuraFrame(p,"DEBUFF",4); PositionAuraButtons(p.debuffFrame,"DEBUFF",4); PositionAuraFrame(p,"BUFF",4); PositionAuraButtons(p.buffFrame,"BUFF",4); if CFG.debuffFrameEnabled then p.debuffFrame:Show() else p.debuffFrame:Hide() end; if CFG.buffFrameEnabled then p.buffFrame:Show() else p.buffFrame:Hide() end; for i=1,4 do p.debuffFrame.buttons[i]:Show(); p.buffFrame.buttons[i]:Show() end
+    UpdatePreviewPersonalResources(p)
+    UpdatePreviewAuraFrames(p)
+    -- A second dependency pass lets newly shown/hidden dynamic parents collapse
+    -- or expand their complete child chain in the same preview refresh.
+    PositionCastbar(p)
+    UpdatePreviewPersonalResources(p)
+    UpdatePreviewAuraFrames(p)
     SyncCustomFrameLevels(p)
 end
 
@@ -719,6 +866,9 @@ local function PositionPreviewPlates(f)
     local availableHeight=math.max(1,(f.canvas:GetHeight() or 500)-20)
     local scale=math.min(1,availableWidth/width,availableHeight/height)
     for _,entry in ipairs(positions) do UpdatePreviewPlate(entry.plate,entry.x*scale,entry.y*scale,scale) end
+    local personalW,personalH=GetPreviewHitboxSize(f.personalPreview)
+    local personalY=(availableHeight-personalH*scale)*.5
+    UpdatePreviewPlate(f.personalPreview,0,personalY,scale)
 end
 
 local function PreviewValue(value)
@@ -734,9 +884,9 @@ local function AnimatePreviewPlayerCast(frame, elapsed)
     p.playerCastOverlay:SetValue(p.previewCastProgress)
     p.playerCastOverlay:Show()
 
-    local width = math.max(1, tonumber(CFG.enemyPlateWidth) or 110)
+    local width = math.max(1, p.playerCastOverlay:GetWidth() or tonumber(CFG.enemyPlateWidth) or 110)
     p.playerCastOverlaySpark:ClearAllPoints()
-    p.playerCastOverlaySpark:SetPoint("CENTER", p.root, "LEFT", width * p.previewCastProgress, 0)
+    p.playerCastOverlaySpark:SetPoint("CENTER", p.playerCastOverlay, "LEFT", width * p.previewCastProgress, 0)
 end
 function EnsureNameplatePreview()
     if State.nameplatePreviewFrame then return State.nameplatePreviewFrame end
@@ -770,9 +920,10 @@ function EnsureNameplatePreview()
     f.canvas:SetPoint("BOTTOMRIGHT",content,"BOTTOMRIGHT",-8,8)
     f.targetPreview=NewPreviewPlate(f.canvas,"target")
     f.focusPreview=NewPreviewPlate(f.canvas,"focus")
+    f.personalPreview=NewPreviewPlate(f.canvas,"personal")
     f.friendlyPreview=NewPreviewPlate(f.canvas,"friendly")
     f.enemyPreview=NewPreviewPlate(f.canvas,"enemy")
-    f.previews={f.targetPreview,f.focusPreview,f.friendlyPreview,f.enemyPreview}
+    f.previews={f.targetPreview,f.focusPreview,f.personalPreview,f.friendlyPreview,f.enemyPreview}
     f:SetScript("OnUpdate",AnimatePreviewPlayerCast)
     f:SetScript("OnSizeChanged",function() if UpdateNameplatePreview then UpdateNameplatePreview() end end)
     f:Hide()
@@ -794,8 +945,13 @@ function UpdateNameplatePreview()
     local enemyHH=math.max(1,tonumber(CFG.enemyNameplateHitboxHeight) or 45)
     local enemyW=math.max(1,tonumber(CFG.enemyPlateWidth) or 110)
     local enemyH=math.max(1,tonumber(CFG.enemyPlateHeight) or 12)
+    local personalHW=math.max(1,tonumber(CFG.personalNameplateHitboxWidth) or 110)
+    local personalHH=math.max(1,tonumber(CFG.personalNameplateHitboxHeight) or 45)
+    local personalW=math.max(1,tonumber(CFG.personalPlateWidth) or 110)
+    local personalH=math.max(1,tonumber(CFG.personalPlateHeight) or 12)
     f.info:SetText(string.format(
-        "%s: %s %s x %s, %s %s x %s    %s: %s, %s\n%s: %s %s x %s, %s %s x %s    %s: %s, %s\n%s: %s    %s: %s    %s: %s",
+        "%s: %s %s x %s, %s %s x %s    %s: %s, %s\n%s: %s %s x %s, %s %s x %s    %s: %s, %s\n%s: %s %s x %s, %s %s x %s    %s: %s, %s\n%s: %s    %s: %s    %s: %s",
+        S2K_L("Personal"),S2K_L("Healthbar"),PreviewValue(personalW),PreviewValue(personalH),S2K_L("Hitbox"),PreviewValue(personalHW),PreviewValue(personalHH),S2K_L("Health offset"),PreviewValue(CFG.personalHealthbarHitboxXOffset),PreviewValue(CFG.personalHealthbarHitboxYOffset),
         S2K_L("Friendly"),S2K_L("Healthbar"),PreviewValue(friendlyW),PreviewValue(friendlyH),S2K_L("Hitbox"),PreviewValue(friendlyHW),PreviewValue(friendlyHH),S2K_L("Health offset"),PreviewValue(CFG.friendlyHealthbarHitboxXOffset),PreviewValue(CFG.friendlyHealthbarHitboxYOffset),
         S2K_L("Enemy"),S2K_L("Healthbar"),PreviewValue(enemyW),PreviewValue(enemyH),S2K_L("Hitbox"),PreviewValue(enemyHW),PreviewValue(enemyHH),S2K_L("Health offset"),PreviewValue(CFG.enemyHealthbarHitboxXOffset),PreviewValue(CFG.enemyHealthbarHitboxYOffset),
         S2K_L("Motion mode"),S2K_L((NAMEPLATE_MOTION_OPTIONS[(tonumber(CFG.nameplateMotion) or 0)+1] or {}).label or "Overlapping / default"),S2K_L("Horizontal overlap"),PreviewValue(CFG.nameplateOverlapH),S2K_L("Vertical overlap"),PreviewValue(CFG.nameplateOverlapV)

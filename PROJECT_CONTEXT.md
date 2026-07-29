@@ -2,7 +2,7 @@
 
 ## Current state
 
-- Current stable version: 1.32.0
+- Current stable version: 1.33.0
 - Target client: World of Warcraft 7.3.5
 - Interface version: 70300
 - Lua compatibility target: Lua 5.1
@@ -93,6 +93,10 @@ Optional features include automatic quest acceptance, automatic turn-in without 
 ## Packaging
 
 The release archive must contain `s2k_Enhancements` as its top-level directory and include the TOC, Lua modules, locales, documentation, and embedded libraries.
+
+## Deferred cleanup
+
+- At a future explicitly compatibility-breaking SavedVariables schema release, remove the one-time per-design aura visibility, anchor-target and anchor-side migrations, their migration flags, the legacy `showBuffFrameOnTarget` / `showDebuffFrameOnTarget` and shared `buffAnchorTo` / `debuffAnchorTo` / `buffAnchorSide` / `debuffAnchorSide` keys, and the corresponding runtime fallbacks. Do not remove them while backward compatibility with existing `s2k_EnhancementsDB` profiles and older export strings is required.
 
 ## Release validation
 

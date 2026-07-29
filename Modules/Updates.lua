@@ -212,8 +212,14 @@ function UpdateHPThresholdMarker(ctx)
 
     local anchor = ctx.health or ctx.root
     local fallbackWidth = tonumber(GetNameplateDimensionValue(ctx, "PlateWidth", 110)) or 110
+    local fallbackHeight = tonumber(GetNameplateDimensionValue(ctx, "PlateHeight", 12)) or 12
     local rootW = (anchor.GetWidth and anchor:GetWidth()) or fallbackWidth
+    local rootH = (anchor.GetHeight and anchor:GetHeight()) or fallbackHeight
     if rootW <= 0 then rootW = fallbackWidth end
+    if rootH <= 0 then rootH = fallbackHeight end
+
+    local inset = math.max(0, tonumber(CFG.hpMarkerInset) or 0)
+    inset = math.min(inset, math.max(0, math.min(rootW, rootH) / 2 - .5))
 
     local mode = tostring(CFG.hpMarkerWidthMode or "LINE")
     local p = rootW * (pct / 100)
@@ -222,10 +228,10 @@ function UpdateHPThresholdMarker(ctx)
     local pointMode = mode
 
     if mode == "LEFT_TO_ZERO" then
-        width = math.max(1, p)
-        x = 0
+        width = math.max(1, p - inset)
+        x = inset
     elseif mode == "RIGHT_TO_END" then
-        width = math.max(1, rootW - p)
+        width = math.max(1, rootW - inset - p)
         x = p
     else
         pointMode = "LINE"
@@ -241,6 +247,7 @@ function UpdateHPThresholdMarker(ctx)
     or marker.s2kMarkerPercent ~= pct
     or marker.s2kMarkerWidth ~= width
     or marker.s2kMarkerX ~= x
+    or marker.s2kMarkerInset ~= inset
     or marker.s2kMarkerFrameLevel ~= frameLevel
     then
         marker:ClearAllPoints()
@@ -251,14 +258,14 @@ function UpdateHPThresholdMarker(ctx)
         end
 
         if pointMode == "LEFT_TO_ZERO" then
-            marker:SetPoint("TOPLEFT", anchor, "TOPLEFT", 0, 0)
-            marker:SetPoint("BOTTOMLEFT", anchor, "BOTTOMLEFT", 0, 0)
+            marker:SetPoint("TOPLEFT", anchor, "TOPLEFT", x, -inset)
+            marker:SetPoint("BOTTOMLEFT", anchor, "BOTTOMLEFT", x, inset)
         elseif pointMode == "RIGHT_TO_END" then
-            marker:SetPoint("TOPLEFT", anchor, "TOPLEFT", x, 0)
-            marker:SetPoint("BOTTOMLEFT", anchor, "BOTTOMLEFT", x, 0)
+            marker:SetPoint("TOPLEFT", anchor, "TOPLEFT", x, -inset)
+            marker:SetPoint("BOTTOMLEFT", anchor, "BOTTOMLEFT", x, inset)
         else
-            marker:SetPoint("TOP", anchor, "TOP", x, 0)
-            marker:SetPoint("BOTTOM", anchor, "BOTTOM", x, 0)
+            marker:SetPoint("TOP", anchor, "TOP", x, -inset)
+            marker:SetPoint("BOTTOM", anchor, "BOTTOM", x, inset)
         end
 
         if frameLevel and marker.SetFrameLevel then
@@ -269,6 +276,7 @@ function UpdateHPThresholdMarker(ctx)
         marker.s2kMarkerPercent = pct
         marker.s2kMarkerWidth = width
         marker.s2kMarkerX = x
+        marker.s2kMarkerInset = inset
         marker.s2kMarkerFrameLevel = frameLevel
     end
 
@@ -525,12 +533,12 @@ end
 
 function UpdateAuraFrame(ctx, kind)
     local unit = ctx.unit
-    local isTarget = IsTargetUnit(unit)
+    local designGroup = GetNameplateDesignGroup(unit)
 
-    local enabled, showOnTarget, frame, filter, maxIcons, onlyPlayer, onlyDispellable, onlyStealable
+    local enabled, showForDesign, frame, filter, maxIcons, onlyPlayer, onlyDispellable, onlyStealable
     if kind == "BUFF" then
         enabled = State.runtimeFlags and State.runtimeFlags.buffs
-        showOnTarget = CFG.showBuffFrameOnTarget
+        showForDesign = CFG[designGroup .. "ShowBuffs"] ~= false
         frame = ctx.buffFrame
         filter = "HELPFUL"
         maxIcons = CFG.buffMaxIcons or 8
@@ -539,7 +547,7 @@ function UpdateAuraFrame(ctx, kind)
         onlyStealable = CFG.buffOnlyStealable
     else
         enabled = State.runtimeFlags and State.runtimeFlags.debuffs
-        showOnTarget = CFG.showDebuffFrameOnTarget
+        showForDesign = CFG[designGroup .. "ShowDebuffs"] ~= false
         frame = ctx.debuffFrame
         filter = "HARMFUL"
         maxIcons = CFG.debuffMaxIcons or 8
@@ -548,9 +556,11 @@ function UpdateAuraFrame(ctx, kind)
         onlyStealable = false
     end
 
-    if not enabled or (isTarget and not showOnTarget) then
+    local wasShown = frame:IsShown()
+    if not enabled or not showForDesign then
         frame:Hide()
         for _, btn in ipairs(frame.buttons or {}) do btn:Hide() end
+        if wasShown and RefreshCollapsibleNameplateLayout then RefreshCollapsibleNameplateLayout(ctx) end
         return
     end
 
@@ -580,6 +590,7 @@ function UpdateAuraFrame(ctx, kind)
     end
 
     frame:Show()
+    if not wasShown and RefreshCollapsibleNameplateLayout then RefreshCollapsibleNameplateLayout(ctx) end
 end
 
 function HideCastbar(ctx)
@@ -603,6 +614,7 @@ function HideCastbar(ctx)
         -- The text was cleared above, so invalidate its cache as well.
         -- Otherwise the same spell skips SetText and remains blank.
         ctx.s2kLastCastName = nil
+        if RefreshCollapsibleNameplateLayout then RefreshCollapsibleNameplateLayout(ctx) end
     end
 end
 
@@ -669,8 +681,12 @@ function UpdateCast(ctx)
         cast:SetStatusBarColor(r, g, b, a)
         ctx.s2kLastCastR, ctx.s2kLastCastG, ctx.s2kLastCastB, ctx.s2kLastCastA = r, g, b, a
     end
-    if not cast:IsShown() then cast:Show() end
+    local castWasHidden = not cast:IsShown()
+    if castWasHidden then cast:Show() end
     if ApplyCastbarBorderVisual then ApplyCastbarBorderVisual(ctx) end
+    if castWasHidden then
+        if RefreshCollapsibleNameplateLayout then RefreshCollapsibleNameplateLayout(ctx) end
+    end
 
     if ctx.castText then
         local textR, textG, textB, textA = GetCastbarSpellNameColor()
@@ -746,35 +762,39 @@ function UpdatePlayerCastOverlaySpark(ctx, value, total)
     end
 
     local width = math.max(1, tonumber(CFG.playerCastOverlaySparkWidth) or 2)
+    local overlay = ctx.playerCastOverlay
     local fallbackW = tonumber(GetNameplateDimensionValue(ctx, "PlateWidth", 110)) or 110
     local fallbackH = tonumber(GetNameplateDimensionValue(ctx, "PlateHeight", 12)) or 12
     local rootW = (ctx.root.GetWidth and ctx.root:GetWidth()) or fallbackW
     local rootH = (ctx.root.GetHeight and ctx.root:GetHeight()) or fallbackH
-    if rootW <= 0 then rootW = fallbackW end
-    if rootH <= 0 then rootH = fallbackH end
+    local contentInset = GetPlayerCastOverlayContentInset and GetPlayerCastOverlayContentInset(ctx) or 0
+    local overlayW = overlay and overlay.GetWidth and overlay:GetWidth() or (rootW - contentInset * 2)
+    local overlayH = overlay and overlay.GetHeight and overlay:GetHeight() or (rootH - contentInset * 2)
+    if overlayW <= 0 then overlayW = math.max(1, fallbackW - contentInset * 2) end
+    if overlayH <= 0 then overlayH = math.max(1, fallbackH - contentInset * 2) end
 
     local ratio = value / total
     if ratio < 0 then ratio = 0 end
     if ratio > 1 then ratio = 1 end
-    local x = (rootW * ratio) - (rootW / 2)
+    local x = (overlayW * ratio) - (overlayW / 2)
 
     -- Hot path cache: during a cast this function is called on the throttled
     -- target runtime path. Only x normally changes; texture, color, size and
     -- frame level should not be re-applied every tick.
-    if spark.s2kSparkWidth ~= width or spark.s2kSparkHeight ~= rootH then
-        spark:SetSize(width, math.max(1, rootH))
-        spark.s2kSparkWidth, spark.s2kSparkHeight = width, rootH
+    if spark.s2kSparkWidth ~= width or spark.s2kSparkHeight ~= overlayH then
+        spark:SetSize(width, math.max(1, overlayH))
+        spark.s2kSparkWidth, spark.s2kSparkHeight = width, overlayH
     end
 
-    if spark.s2kSparkAnchorRoot ~= ctx.root then
+    if spark.s2kSparkAnchorRoot ~= overlay then
         spark:ClearAllPoints()
-        spark:SetPoint("CENTER", ctx.root, "CENTER", x, 0)
-        spark.s2kSparkAnchorRoot = ctx.root
+        spark:SetPoint("CENTER", overlay, "CENTER", x, 0)
+        spark.s2kSparkAnchorRoot = overlay
         spark.s2kSparkLastX = x
     elseif not spark.s2kSparkLastX or math.abs((spark.s2kSparkLastX or 0) - x) >= 0.10 then
         -- Calling SetPoint with the same point updates the existing anchor on
         -- this client and avoids the old ClearAllPoints churn.
-        spark:SetPoint("CENTER", ctx.root, "CENTER", x, 0)
+        spark:SetPoint("CENTER", overlay, "CENTER", x, 0)
         spark.s2kSparkLastX = x
     end
 
@@ -867,11 +887,7 @@ function UpdatePlayerCastOverlay(ctx, knownTarget)
     end
 
     local bar = ctx.playerCastOverlay
-    if bar.s2kAllPointsRoot ~= ctx.root then
-        bar:ClearAllPoints()
-        bar:SetAllPoints(ctx.root)
-        bar.s2kAllPointsRoot = ctx.root
-    end
+    if PositionPlayerCastOverlay then PositionPlayerCastOverlay(ctx) end
     if bar.s2kLastTotal ~= total then
         bar:SetMinMaxValues(0, total)
         bar.s2kLastTotal = total

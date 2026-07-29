@@ -129,8 +129,8 @@ function S2KNP_RebuildRuntimeFlags()
     flags.levelOverlay = enabled and AnyDesignEnabled("ShowLevelOverlay")
     flags.hpMarker = enabled and AnyDesignEnabled("ShowHPMarker")
     flags.castbar = enabled and CFG.showCastbar ~= false
-    flags.buffs = enabled and CFG.buffFrameEnabled ~= false
-    flags.debuffs = enabled and CFG.debuffFrameEnabled ~= false
+    flags.buffs = enabled and CFG.buffFrameEnabled ~= false and AnyDesignEnabled("ShowBuffs")
+    flags.debuffs = enabled and CFG.debuffFrameEnabled ~= false and AnyDesignEnabled("ShowDebuffs")
     flags.auras = flags.buffs or flags.debuffs
     flags.playerCastOverlay = enabled and CFG.targetPlayerCastOverlayEnabled == true
     flags.targetRuntimeHealth = enabled and CFG.moduleTargetRuntimeHealthEnabled ~= false
@@ -172,6 +172,13 @@ function S2KNP_RegisterBaseEvents()
     A:RegisterEvent("PLAYER_TARGET_CHANGED")
     A:RegisterEvent("PLAYER_FOCUS_CHANGED")
     A:RegisterEvent("PLAYER_REGEN_ENABLED")
+    A:RegisterEvent("PLAYER_SPECIALIZATION_CHANGED")
+    A:RegisterEvent("UNIT_DISPLAYPOWER")
+    A:RegisterEvent("UNIT_POWER_FREQUENT")
+    A:RegisterEvent("UNIT_POWER")
+    A:RegisterEvent("UNIT_MAXPOWER")
+    A:RegisterEvent("RUNE_POWER_UPDATE")
+    A:RegisterEvent("RUNE_TYPE_UPDATE")
     A:RegisterEvent("CVAR_UPDATE")
     A:RegisterEvent("QUEST_DETAIL")
     A:RegisterEvent("QUEST_PROGRESS")

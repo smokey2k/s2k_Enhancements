@@ -13,10 +13,14 @@ CVAR_OPTION_DEFS = {
     nameplateOtherTopInset     = { cvar = "nameplateOtherTopInset",     default = 0.08,  min = 0.00, max = 1.00, step = 0.01 },
     nameplateOverlapH          = { cvar = "nameplateOverlapH",          default = 0.80,  min = 0.00, max = 3.00, step = 0.05 },
     nameplateOverlapV          = { cvar = "nameplateOverlapV",          default = 1.10,  min = 0.00, max = 3.00, step = 0.05 },
+    nameplateSelfAlpha         = { cvar = "nameplateSelfAlpha",         default = 1.00,  min = 0.00, max = 1.00, step = 0.05 },
 }
 
 NAMEPLATE_BOOLEAN_CVAR_DEFS = {
     nameplateShowSelf            = { cvar = "nameplateShowSelf",            default = true  },
+    nameplatePersonalShowAlways  = { cvar = "NameplatePersonalShowAlways",  default = true  },
+    nameplatePersonalShowInCombat= { cvar = "NameplatePersonalShowInCombat",default = false },
+    nameplatePersonalShowWithTarget={cvar = "NameplatePersonalShowWithTarget",default = false },
     nameplateResourceOnTarget    = { cvar = "nameplateResourceOnTarget",    default = false },
     nameplateShowAll             = { cvar = "nameplateShowAll",             default = false },
     nameplateShowEnemies         = { cvar = "nameplateShowEnemies",         default = true  },
@@ -261,6 +265,44 @@ function CopyDefaults()
         DB.nameplateGroupsV1Migrated = true
     end
 
+    if not DB.nameplateAuraVisibilityV1Migrated then
+        for _, group in ipairs(NAMEPLATE_DESIGN_GROUPS) do
+            if DB[group .. "ShowBuffs"] == nil then
+                if group == "target" then DB[group .. "ShowBuffs"] = DB.showBuffFrameOnTarget ~= false
+                else DB[group .. "ShowBuffs"] = true end
+            end
+            if DB[group .. "ShowDebuffs"] == nil then
+                if group == "target" then DB[group .. "ShowDebuffs"] = DB.showDebuffFrameOnTarget ~= false
+                else DB[group .. "ShowDebuffs"] = true end
+            end
+        end
+        DB.nameplateAuraVisibilityV1Migrated = true
+    end
+
+    if not DB.nameplateAuraAnchorSideV1Migrated then
+        for _, group in ipairs(NAMEPLATE_DESIGN_GROUPS) do
+            if DB[group .. "BuffAnchorSide"] == nil then
+                DB[group .. "BuffAnchorSide"] = DB.buffAnchorSide or DEFAULTS.buffAnchorSide or "TOP"
+            end
+            if DB[group .. "DebuffAnchorSide"] == nil then
+                DB[group .. "DebuffAnchorSide"] = DB.debuffAnchorSide or DEFAULTS.debuffAnchorSide or "TOP"
+            end
+        end
+        DB.nameplateAuraAnchorSideV1Migrated = true
+    end
+
+    if not DB.nameplateAuraAnchorTargetV1Migrated then
+        for _, group in ipairs(NAMEPLATE_DESIGN_GROUPS) do
+            if DB[group .. "BuffAnchorTo"] == nil then
+                DB[group .. "BuffAnchorTo"] = DB.buffAnchorTo or DEFAULTS.buffAnchorTo or "HEALTH"
+            end
+            if DB[group .. "DebuffAnchorTo"] == nil then
+                DB[group .. "DebuffAnchorTo"] = DB.debuffAnchorTo or DEFAULTS.debuffAnchorTo or "HEALTH"
+            end
+        end
+        DB.nameplateAuraAnchorTargetV1Migrated = true
+    end
+
     -- Rebuild CFG from the active profile every time. Do not leave stale values
     -- from the previously active profile in memory. This matters when older
     -- profiles do not contain a key that newer builds added later.
@@ -299,6 +341,22 @@ function CopyDefaults()
 
     for k in pairs(DEFAULTS) do
         CFG[k] = DB[k]
+    end
+
+    -- These are implementation details of the single Personal resource
+    -- display switch, not separate user preferences. Older profiles may have
+    -- imported Blizzard's default zero values when the keys were introduced.
+    -- Keep the addon switch authoritative and make its enabled state genuinely
+    -- visible in every supported Legion visibility mode.
+    if CFG.nameplateShowSelf then
+        DB.nameplatePersonalShowAlways = true
+        DB.nameplatePersonalShowInCombat = false
+        DB.nameplatePersonalShowWithTarget = false
+        DB.nameplateSelfAlpha = 1
+        CFG.nameplatePersonalShowAlways = true
+        CFG.nameplatePersonalShowInCombat = false
+        CFG.nameplatePersonalShowWithTarget = false
+        CFG.nameplateSelfAlpha = 1
     end
 
     -- Retain the legacy SavedVariables key, but make the Custom Nameplates

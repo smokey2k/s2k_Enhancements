@@ -162,14 +162,143 @@ function ApplyCastbarBorderVisual(ctx)
 
     local r, g, b, a = GetCastbarBorderColor()
     ApplyBorderVisual(ctx.castBorder, CFG.castbarBorderTextureKey, GetConfiguredBorderTexturePath('castbarBorderTextureKey', 'castbarBorderTexturePath'), CFG.castbarBorderSize, CFG.castbarBorderInset, CFG.castbarBorderOffset, r, g, b, a)
+    local base = ctx.root and ctx.root.GetFrameLevel and ctx.root:GetFrameLevel() or 0
+    if ctx.castBorder.SetFrameLevel then
+        ctx.castBorder:SetFrameLevel(base + (tonumber(CFG.castbarBorderFrameLevel) or 5))
+    end
+end
+
+local function GetLayoutGroup(ctx)
+    if ctx and ctx.designGroup then return ctx.designGroup end
+    return GetNameplateDesignGroup(ctx and ctx.unit)
+end
+
+function GetLayoutNodeParent(ctx, node)
+    local group = GetLayoutGroup(ctx)
+    if node == "CAST" then return CFG[group .. "CastbarAnchorTo"] or "HEALTH" end
+    if node == "BUFF" then return CFG[group .. "BuffAnchorTo"] or CFG.buffAnchorTo or "HEALTH" end
+    if node == "DEBUFF" then return CFG[group .. "DebuffAnchorTo"] or CFG.debuffAnchorTo or "HEALTH" end
+    if node == "PERSONAL_RESOURCE" then return CFG.personalResourceBarAnchorTo or "HEALTH" end
+    if node == "PERSONAL_CLASS_RESOURCE" then return CFG.personalClassResourceAnchorTo or "HEALTH" end
+    return "HEALTH"
+end
+
+function GetLayoutNodeSide(ctx, node)
+    local group = GetLayoutGroup(ctx)
+    local side
+    if node == "CAST" then side = CFG[group .. "CastbarAnchorSide"] or "BOTTOM"
+    elseif node == "BUFF" then side = CFG[group .. "BuffAnchorSide"] or CFG.buffAnchorSide or "TOP"
+    elseif node == "DEBUFF" then side = CFG[group .. "DebuffAnchorSide"] or CFG.debuffAnchorSide or "TOP"
+    elseif node == "PERSONAL_RESOURCE" then side = CFG.personalResourceBarAnchorSide or "BOTTOM"
+    elseif node == "PERSONAL_CLASS_RESOURCE" then side = CFG.personalClassResourceAnchorSide or "BOTTOM"
+    end
+    local parent = GetLayoutNodeParent(ctx, node)
+    if parent ~= "HEALTH" and side ~= "TOP" and side ~= "BOTTOM" then side = "TOP" end
+    return side or "TOP"
+end
+
+function GetLayoutNodeOffset(node)
+    if node == "CAST" then return tonumber(CFG.castbarYOffset) or -2 end
+    if node == "BUFF" then return tonumber(CFG.buffYOffset) or 0 end
+    if node == "DEBUFF" then return tonumber(CFG.debuffYOffset) or 0 end
+    if node == "PERSONAL_RESOURCE" then return tonumber(CFG.personalResourceBarYOffset) or 0 end
+    if node == "PERSONAL_CLASS_RESOURCE" then return tonumber(CFG.personalClassResourceYOffset) or 0 end
+    return 0
+end
+
+function GetEffectiveLayoutNodeOffset(ctx, node)
+    local offset = GetLayoutNodeOffset(node)
+    if GetLayoutNodeSide(ctx, node) == "TOP"
+    and (node == "CAST" or node == "PERSONAL_RESOURCE" or node == "PERSONAL_CLASS_RESOURCE") then
+        return -offset
+    end
+    return offset
+end
+
+function GetLayoutNodeFrame(ctx, node)
+    if node == "HEALTH" then return ctx and ctx.root end
+    if node == "CAST" then return ctx and ctx.cast end
+    if node == "BUFF" then return ctx and ctx.buffFrame end
+    if node == "DEBUFF" then return ctx and ctx.debuffFrame end
+    if node == "PERSONAL_RESOURCE" then return ctx and ctx.personalResourceBar end
+    if node == "PERSONAL_CLASS_RESOURCE" then return ctx and ctx.personalClassResource end
+end
+
+local function IsLayoutNodeVisible(ctx, node)
+    local frame = GetLayoutNodeFrame(ctx, node)
+    return frame and frame.IsShown and frame:IsShown()
+end
+
+local function GetSafeLayoutParent(ctx, node)
+    local parent = GetLayoutNodeParent(ctx, node)
+    local seen = {[node]=true}
+    local cursor = parent
+    while cursor and cursor ~= "HEALTH" do
+        if seen[cursor] then return "HEALTH" end
+        seen[cursor] = true
+        cursor = GetLayoutNodeParent(ctx, cursor)
+    end
+    return parent
+end
+
+local function AnchorCollapsedNode(ctx, node, anchor)
+    local side, offset = GetLayoutNodeSide(ctx, node), GetEffectiveLayoutNodeOffset(ctx, node)
+    local holder = GetProgressBarFallbackAnchor(ctx, node, side)
+    holder:ClearAllPoints()
+    if side == "BOTTOM" then holder:SetPoint("CENTER", anchor, "BOTTOM", 0, offset)
+    elseif side == "LEFT" then holder:SetPoint("CENTER", anchor, "LEFT", offset, 0)
+    elseif side == "RIGHT" then holder:SetPoint("CENTER", anchor, "RIGHT", offset, 0)
+    else holder:SetPoint("CENTER", anchor, "TOP", 0, offset) end
+    return holder
+end
+
+function ResolveLayoutNodeAnchor(ctx, node, resolving)
+    if node == "HEALTH" then return ctx.root end
+    resolving = resolving or {}
+    if resolving[node] then return ctx.root end
+    resolving[node] = true
+    local parent = GetSafeLayoutParent(ctx, node)
+    local parentAnchor
+    if parent == "HEALTH" then
+        parentAnchor = ctx.root
+    elseif IsLayoutNodeVisible(ctx, parent) then
+        parentAnchor = GetLayoutNodeFrame(ctx, parent)
+    else
+        local ancestor = ResolveLayoutNodeAnchor(ctx, parent, resolving)
+        parentAnchor = AnchorCollapsedNode(ctx, parent, ancestor)
+    end
+    resolving[node] = nil
+    return parentAnchor
+end
+
+local function AnchorBarFrame(frame, anchor, side, offset, xOffset)
+    frame:ClearAllPoints()
+    xOffset = tonumber(xOffset) or 0
+    if side == "TOP" then frame:SetPoint("BOTTOM", anchor, "TOP", xOffset, offset)
+    else frame:SetPoint("TOP", anchor, "BOTTOM", xOffset, offset) end
 end
 
 function PositionCastbar(ctx)
     local cast = ctx.cast
-    cast:ClearAllPoints()
-    cast:SetPoint("TOPLEFT", ctx.root, "BOTTOMLEFT", 0, CFG.castbarYOffset or -2)
-    cast:SetPoint("TOPRIGHT", ctx.root, "BOTTOMRIGHT", 0, CFG.castbarYOffset or -2)
+    local side = GetLayoutNodeSide(ctx, "CAST")
+    local offset = GetEffectiveLayoutNodeOffset(ctx, "CAST")
+    local anchor = ResolveLayoutNodeAnchor(ctx, "CAST")
+    AnchorBarFrame(cast, anchor, side, offset, CFG.castbarXOffset)
+    local healthWidth = ctx.health and ctx.health.GetWidth and ctx.health:GetWidth()
+        or ctx.root and ctx.root.GetWidth and ctx.root:GetWidth()
+        or 1
+    local castWidth = CFG.castbarCustomWidthEnabled
+        and tonumber(CFG.castbarWidth)
+        or healthWidth
+    cast:SetWidth(math.max(1, castWidth or healthWidth))
     cast:SetHeight(CFG.castbarHeight or 6)
+    if cast.SetFrameStrata then
+        local strata = tostring(CFG.castbarFrameStrata or "HIGH"):upper()
+        if strata ~= "BACKGROUND" and strata ~= "LOW" and strata ~= "MEDIUM" and strata ~= "HIGH"
+        and strata ~= "DIALOG" and strata ~= "FULLSCREEN" and strata ~= "FULLSCREEN_DIALOG"
+        and strata ~= "TOOLTIP" then strata = "HIGH" end
+        cast:SetFrameStrata(strata)
+    end
 
     ApplyCastbarBorderVisual(ctx)
 
@@ -186,21 +315,51 @@ function PositionCastbar(ctx)
     end
 end
 
-function ResolveAuraAnchor(ctx, kind)
-    local anchorTo = kind == "BUFF" and CFG.buffAnchorTo or CFG.debuffAnchorTo
+function GetPlayerCastOverlayContentInset(ctx)
+    local inset = math.max(0, tonumber(CFG.playerCastOverlayInset) or 0)
+    local root = ctx and ctx.root
+    local width = root and root.GetWidth and root:GetWidth() or 0
+    local height = root and root.GetHeight and root:GetHeight() or 0
+    local halfSmallest = math.min(width or 0, height or 0) / 2
+    if halfSmallest > 0 then inset = math.min(inset, math.max(0, halfSmallest - .5)) end
+    return inset
+end
 
-    -- Prevent self-anchor and simple mutual cycles.
-    if kind == "BUFF" then
-        if anchorTo == "BUFF" then anchorTo = "HEALTH" end
-        if anchorTo == "DEBUFF" and CFG.debuffAnchorTo == "BUFF" then anchorTo = "HEALTH" end
-    else
-        if anchorTo == "DEBUFF" then anchorTo = "HEALTH" end
-        if anchorTo == "BUFF" and CFG.buffAnchorTo == "DEBUFF" then anchorTo = "HEALTH" end
+function PositionPlayerCastOverlay(ctx)
+    local bar, root = ctx and ctx.playerCastOverlay, ctx and ctx.root
+    if not bar or not root then return 0 end
+    local margin = GetPlayerCastOverlayContentInset(ctx)
+    if bar.s2kContentInset ~= margin or bar.s2kAnchorRoot ~= root then
+        bar:ClearAllPoints()
+        bar:SetPoint("TOPLEFT", root, "TOPLEFT", margin, -margin)
+        bar:SetPoint("BOTTOMRIGHT", root, "BOTTOMRIGHT", -margin, margin)
+        bar.s2kContentInset = margin
+        bar.s2kAnchorRoot = root
     end
+    return margin
+end
 
-    if anchorTo == "BUFF" then return ctx.buffFrame end
-    if anchorTo == "DEBUFF" then return ctx.debuffFrame end
-    return ctx.root
+function GetConfiguredAuraAnchorTarget(ctx, kind)
+    return GetLayoutNodeParent(ctx, kind)
+end
+
+function GetProgressBarFallbackAnchor(ctx, key, side)
+    if not ctx or not ctx.root then return ctx and ctx.root end
+    ctx.s2kProgressBarFallbacks = ctx.s2kProgressBarFallbacks or {}
+    local anchor = ctx.s2kProgressBarFallbacks[key]
+    if not anchor then
+        anchor = CreateFrame("Frame", nil, ctx.root)
+        anchor:SetSize(1, 1)
+        ctx.s2kProgressBarFallbacks[key] = anchor
+    end
+    anchor:ClearAllPoints()
+    if side == "TOP" then anchor:SetPoint("CENTER", ctx.root, "TOP", 0, 0)
+    else anchor:SetPoint("CENTER", ctx.root, "BOTTOM", 0, 0) end
+    return anchor
+end
+
+function ResolveAuraAnchor(ctx, kind)
+    return ResolveLayoutNodeAnchor(ctx, kind)
 end
 
 function GetAuraLayoutSettings(kind)
@@ -259,7 +418,7 @@ end
 function PositionAuraFrame(ctx, kind, count)
     local frame = kind == "BUFF" and ctx.buffFrame or ctx.debuffFrame
     local anchor = ResolveAuraAnchor(ctx, kind)
-    local side = kind == "BUFF" and CFG.buffAnchorSide or CFG.debuffAnchorSide
+    local side = GetLayoutNodeSide(ctx, kind)
     local offset = kind == "BUFF" and CFG.buffYOffset or CFG.debuffYOffset
     local frameW, frameH = GetAuraGridSize(kind, count or 0)
 
@@ -278,6 +437,18 @@ function PositionAuraFrame(ctx, kind, count)
     else
         frame:SetPoint("BOTTOM", anchor, "TOP", 0, offset)
     end
+end
+
+function RefreshCollapsibleNameplateLayout(ctx)
+    if not ctx or ctx.s2kRefreshingCollapsibleLayout then return end
+    ctx.s2kRefreshingCollapsibleLayout = true
+    PositionCastbar(ctx)
+    if GetNameplateDimensionGroup(ctx.unit) == "personal" and ApplyPersonalResourceDisplaySettings then
+        ApplyPersonalResourceDisplaySettings()
+    end
+    if ctx.buffFrame then PositionAuraFrame(ctx, "BUFF") end
+    if ctx.debuffFrame then PositionAuraFrame(ctx, "DEBUFF") end
+    ctx.s2kRefreshingCollapsibleLayout = nil
 end
 
 function LayoutAll(ctx)

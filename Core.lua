@@ -1,7 +1,7 @@
 -- =========================================================
 -- s2k:Enhancements (s2k Enhancements)
 -- WoW 7.3.5
--- v1.32.0
+-- v1.33.0
 -- Note: top-level helper functions are intentionally non-local to stay under the Lua 5.1 chunk-local limit.
 --
 -- Custom Blizzard-nameplate driven skin system.
@@ -22,7 +22,7 @@ _G.s2k_Enhancements = _G.s2k_Enhancements or {}
 API = _G.s2k_Enhancements
 -- Backward-compatible API alias for integrations written for the old addon name.
 _G.s2k_Nameplates = API
-API.version = "1.32.0"
+API.version = "1.33.0"
 
 
 DEFAULTS = {
@@ -196,7 +196,11 @@ DEFAULTS = {
     -- Castbar
     showCastbar = true,
     castbarHeight = 6,
+    castbarCustomWidthEnabled = false,
+    castbarWidth = 110,
+    castbarXOffset = 0,
     castbarYOffset = -2,
+    castbarFrameStrata = "HIGH",
     castbarTexture = "Interface\\TargetingFrame\\UI-StatusBar", -- legacy/custom fallback path
     castbarTextureKey = "BLIZZARD_STATUSBAR",
     castbarTexturePath = "Interface\\TargetingFrame\\UI-StatusBar",
@@ -218,6 +222,7 @@ DEFAULTS = {
     castbarBorderSize = 1,
     castbarBorderInset = 0,
     castbarBorderOffset = 1,
+    castbarBorderFrameLevel = 5,
     castbarBorderColorR = 0.00,
     castbarBorderColorG = 0.00,
     castbarBorderColorB = 0.00,
@@ -241,6 +246,7 @@ DEFAULTS = {
     playerCastOverlayColorG = 0.55,
     playerCastOverlayColorB = 1.00,
     playerCastOverlayColorA = 0.55,
+    playerCastOverlayInset = 0,
     playerCastOverlayFrameLevel = 20,
     playerCastOverlaySparkEnabled = true,
     playerCastOverlaySparkWidth = 2,
@@ -250,6 +256,45 @@ DEFAULTS = {
     playerCastOverlaySparkColorG = 1.00,
     playerCastOverlaySparkColorB = 1.00,
     playerCastOverlaySparkColorA = 1.00,
+
+    -- Blizzard Personal Resource Display children
+    personalResourceBarEnabled = true,
+    personalResourceBarWidth = 110,
+    personalResourceBarHeight = 8,
+    personalResourceBarXOffset = 0,
+    personalResourceBarYOffset = -2,
+    personalResourceBarFrameStrata = "HIGH",
+    personalResourceBarAnchorTo = "HEALTH",
+    personalResourceBarAnchorSide = "BOTTOM",
+    personalResourceBarTextureKey = "BLIZZARD_STATUSBAR",
+    personalResourceBarTexturePath = "Interface\\TargetingFrame\\UI-StatusBar",
+    personalResourceBarColorR = 0.15, personalResourceBarColorG = 0.45, personalResourceBarColorB = 1.00, personalResourceBarColorA = 1.00,
+    personalResourceBarBackdropTextureKey = "FLAT_WHITE",
+    personalResourceBarBackdropTexturePath = "Interface\\Buttons\\WHITE8X8",
+    personalResourceBarBackdropColorR = 0.00, personalResourceBarBackdropColorG = 0.00, personalResourceBarBackdropColorB = 0.00, personalResourceBarBackdropColorA = 0.70,
+    personalResourceBarBorderTextureKey = "S2K_SOLID",
+    personalResourceBarBorderTexturePath = "Interface\\Buttons\\WHITE8X8",
+    personalResourceBarBorderSize = 1,
+    personalResourceBarBorderInset = 0,
+    personalResourceBarBorderOffset = 1,
+    personalResourceBarBorderFrameLevel = 5,
+    personalResourceBarBorderColorR = 0.00, personalResourceBarBorderColorG = 0.00, personalResourceBarBorderColorB = 0.00, personalResourceBarBorderColorA = 1.00,
+    personalClassResourceEnabled = true,
+    personalClassResourceWidth = 110,
+    personalClassResourceHeight = 10,
+    personalClassResourceXOffset = 0,
+    personalClassResourceYOffset = -12,
+    personalClassResourceAnchorTo = "HEALTH",
+    personalClassResourceAnchorSide = "BOTTOM",
+    personalClassResourceTextureKey = "FLAT_WHITE",
+    personalClassResourceTexturePath = "Interface\\Buttons\\WHITE8X8",
+    personalClassResourceColorR = 1.00, personalClassResourceColorG = 0.72, personalClassResourceColorB = 0.08, personalClassResourceColorA = 1.00,
+    personalClassResourceBackdropTextureKey = "FLAT_WHITE",
+    personalClassResourceBackdropTexturePath = "Interface\\Buttons\\WHITE8X8",
+    personalClassResourceBackdropColorR = 0.00, personalClassResourceBackdropColorG = 0.00, personalClassResourceBackdropColorB = 0.00, personalClassResourceBackdropColorA = 0.70,
+    personalClassResourceSpacing = 2,
+    personalClassResourceBorderEnabled = true,
+    personalClassResourceBorderColorR = 0.00, personalClassResourceBorderColorG = 0.00, personalClassResourceBorderColorB = 0.00, personalClassResourceBorderColorA = 1.00,
 
     -- Unit level overlay
     levelOverlayEnabled = false,
@@ -271,6 +316,7 @@ DEFAULTS = {
     hpMarkerOnlyTarget = false,
     hpMarkerOnlyEnemy = false,
     hpMarkerPercent = 35,
+    hpMarkerInset = 0,
     hpMarkerWidth = 2,
     hpMarkerWidthMode = "LINE",
     hpMarkerUseBorderColor = false,
@@ -330,6 +376,10 @@ DEFAULTS = {
     nameplateOverlapH = 0.80,
     nameplateOverlapV = 1.10,
     nameplateShowSelf = true,
+    nameplatePersonalShowAlways = true,
+    nameplatePersonalShowInCombat = false,
+    nameplatePersonalShowWithTarget = false,
+    nameplateSelfAlpha = 1.00,
     nameplateResourceOnTarget = false,
     nameplateShowAll = false,
     nameplateShowEnemies = true,
@@ -489,8 +539,13 @@ SIDE_OPTIONS = {
     { key = "RIGHT", label = "Right" },
 }
 
-NAMEPLATE_DESIGN_GROUPS = { "target", "focus", "friendly", "enemy" }
-NAMEPLATE_DIMENSION_GROUPS = { "friendly", "enemy" }
+PROGRESS_BAR_ANCHOR_OPTIONS = {
+    { key = "TOP", label = "Top" },
+    { key = "BOTTOM", label = "Bottom" },
+}
+
+NAMEPLATE_DESIGN_GROUPS = { "target", "focus", "personal", "friendly", "enemy" }
+NAMEPLATE_DIMENSION_GROUPS = { "personal", "friendly", "enemy" }
 
 local NAMEPLATE_GENERAL_DESIGN_DEFAULTS = {
     HealthTextureKey = "BLIZZARD_STATUSBAR",
@@ -502,9 +557,13 @@ local NAMEPLATE_GENERAL_DESIGN_DEFAULTS = {
     HealthBackdropColorR = 0.00, HealthBackdropColorG = 0.00, HealthBackdropColorB = 0.00, HealthBackdropColorA = 0.65,
     BorderTextureKey = "S2K_SOLID",
     BorderTexturePath = "Interface\\Buttons\\WHITE8X8",
-    BorderSize = 1, BorderInset = 0, BorderOffset = 1,
+    BorderSize = 1, BorderInset = 0, BorderOffset = 1, BorderFrameLevel = 3,
     BorderColorR = 0.00, BorderColorG = 0.00, BorderColorB = 0.00, BorderColorA = 1.00,
     ShowNames = false, ShowHPRatio = true, ShowLevelOverlay = false, ShowHPMarker = false,
+    ShowBuffs = true, ShowDebuffs = true,
+    CastbarAnchorTo = "HEALTH", CastbarAnchorSide = "BOTTOM",
+    BuffAnchorTo = "HEALTH", DebuffAnchorTo = "HEALTH",
+    BuffAnchorSide = "TOP", DebuffAnchorSide = "TOP",
     HPMarkerColorR = 1.00, HPMarkerColorG = 1.00, HPMarkerColorB = 1.00, HPMarkerColorA = 1.00,
 }
 
@@ -555,10 +614,12 @@ NAMEPLATE_MOTION_OPTIONS = {
 
 BUFF_ANCHOR_OPTIONS = {
     { key = "HEALTH", label = "Healthbar" },
+    { key = "CAST", label = "Castbar" },
     { key = "DEBUFF", label = "Debuff frame" },
 }
 
 DEBUFF_ANCHOR_OPTIONS = {
     { key = "HEALTH", label = "Healthbar" },
+    { key = "CAST", label = "Castbar" },
     { key = "BUFF", label = "Buff frame" },
 }

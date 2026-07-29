@@ -102,11 +102,19 @@ function IsFocusUnit(unit)
 end
 
 function GetNameplateDimensionGroup(unit)
+    if unit and UnitIsUnit then
+        local ok, same = pcall(UnitIsUnit, unit, "player")
+        if ok and same then return "personal" end
+    end
+    local unitGUID = unit and UnitGUID and UnitGUID(unit)
+    local playerGUID = UnitGUID and UnitGUID("player")
+    if unitGUID and playerGUID and unitGUID == playerGUID then return "personal" end
     if unit and UnitCanAttack and UnitCanAttack("player", unit) then return "enemy" end
     return "friendly"
 end
 
 function GetNameplateDesignGroup(unit)
+    if GetNameplateDimensionGroup(unit) == "personal" then return "personal" end
     if IsTargetUnit(unit) then return "target" end
     if IsFocusUnit(unit) then return "focus" end
     return GetNameplateDimensionGroup(unit)

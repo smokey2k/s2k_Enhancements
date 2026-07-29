@@ -4,7 +4,7 @@
 ## Notes: s2k Enhancements - custom nameplates, quest enhancements, addon integrations and an LDB-accessible standalone configuration window for WoW 7.3.5.
 ## Notes-huHU: s2k Enhancements - egyéni névplate-ek, küldetéskiegészítések, addonintegrációk és LDB-ből elérhető önálló beállítási ablak WoW 7.3.5-höz.
 ## Author: s2k
-## Version: 1.32.0
+## Version: 1.33.0
 ## SavedVariables: s2k_EnhancementsDB, s2k_NameplatesDB
 ## OptionalDeps: WeakAuras, WeakAurasOptions, Dominos
 
@@ -59,6 +59,7 @@ Locales/enUS.lua
 Locales/huHU.lua
 Modules/ModuleManager.lua
 Modules/SavedSettings.lua
+Modules/CustomNameplateTransfer.lua
 Modules/Helpers.lua
 Modules/Profiler.lua
 Modules/Fonts.lua
@@ -68,6 +69,7 @@ Modules/Frames.lua
 Modules/WeakAuraAnchors.lua
 Modules/BlizzardVisuals.lua
 Modules/Layout.lua
+Modules/PersonalResources.lua
 Modules/Updates.lua
 Modules/OptionsApply.lua
 Modules/QuestReputation.lua
