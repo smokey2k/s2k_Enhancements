@@ -341,6 +341,80 @@ function ApplyNameplateHitboxSize()
     end
 end
 
+local PERSONAL_RESOURCE_BOOLEAN_CVAR_KEYS = {
+    nameplatePersonalShowAlways = true,
+    nameplatePersonalShowInCombat = true,
+    nameplatePersonalShowWithTarget = true,
+    nameplateShowSelf = true,
+}
+
+local function WritePersonalResourceDisplayCVars()
+    local enabled = CFG.nameplateShowSelf and true or false
+
+    -- The three visibility-mode CVars are implementation details of the
+    -- addon's single switch.  Set them before nameplateShowSelf so enabling
+    -- the display cannot briefly inherit a stale Blizzard visibility mode.
+    DB.nameplatePersonalShowAlways = true
+    DB.nameplatePersonalShowInCombat = false
+    DB.nameplatePersonalShowWithTarget = false
+    CFG.nameplatePersonalShowAlways = true
+    CFG.nameplatePersonalShowInCombat = false
+    CFG.nameplatePersonalShowWithTarget = false
+
+    if enabled then
+        DB.nameplateSelfAlpha = 1
+        CFG.nameplateSelfAlpha = 1
+    end
+
+    SetCVarIfChanged("NameplatePersonalShowAlways", 1)
+    SetCVarIfChanged("NameplatePersonalShowInCombat", 0)
+    SetCVarIfChanged("NameplatePersonalShowWithTarget", 0)
+    SetCVarIfChanged("nameplateSelfAlpha", tonumber(CFG.nameplateSelfAlpha) or 1)
+    SetCVarIfChanged("nameplateShowSelf", enabled and 1 or 0)
+
+    return enabled
+end
+
+local function PersonalResourceDisplayCVarsMatch(enabled)
+    return GetBooleanCVar("nameplateShowSelf", not enabled) == enabled
+        and GetBooleanCVar("NameplatePersonalShowAlways", false) == true
+        and GetBooleanCVar("NameplatePersonalShowInCombat", true) == false
+        and GetBooleanCVar("NameplatePersonalShowWithTarget", true) == false
+        and (not enabled or math.abs(GetNumericCVar("nameplateSelfAlpha", 0) - 1) < 0.000001)
+end
+
+function ApplyPersonalResourceDisplayCVarSettings(scheduleRetries)
+    if InCombatLockdown and InCombatLockdown() then
+        State.pendingCVarApply = true
+        return false
+    end
+
+    local alreadyApplying = State.applyingNameplateCVars
+    State.applyingNameplateCVars = true
+    local enabled = WritePersonalResourceDisplayCVars()
+    State.applyingNameplateCVars = alreadyApplying
+
+    local matched = PersonalResourceDisplayCVarsMatch(enabled)
+    if scheduleRetries ~= false then
+        State.personalResourceCVarApplyGeneration = (State.personalResourceCVarApplyGeneration or 0) + 1
+        local generation = State.personalResourceCVarApplyGeneration
+        if C_Timer and C_Timer.After then
+            local function Retry()
+                if State.personalResourceCVarApplyGeneration == generation
+                and CFG
+                and (CFG.nameplateShowSelf and true or false) == enabled
+                then
+                    ApplyPersonalResourceDisplayCVarSettings(false)
+                end
+            end
+            C_Timer.After(0.05, Retry)
+            C_Timer.After(0.50, Retry)
+        end
+    end
+
+    return matched
+end
+
 function ApplyNameplateCVarSettings()
     if InCombatLockdown and InCombatLockdown() then
         State.pendingCVarApply = true
@@ -353,22 +427,27 @@ function ApplyNameplateCVarSettings()
     ApplyNameplateHitboxSize()
 
     for key, def in pairs(CVAR_OPTION_DEFS) do
-        local value = tonumber(CFG[key])
-        if value == nil then
-            value = def.default or 0
-        end
+        if key ~= "nameplateSelfAlpha" then
+            local value = tonumber(CFG[key])
+            if value == nil then
+                value = def.default or 0
+            end
 
-        if def.integer then
-            value = math.floor(value + 0.5)
-        end
+            if def.integer then
+                value = math.floor(value + 0.5)
+            end
 
-        SetCVarIfChanged(def.cvar, value)
+            SetCVarIfChanged(def.cvar, value)
+        end
     end
 
     for key, def in pairs(NAMEPLATE_BOOLEAN_CVAR_DEFS or {}) do
-        SetCVarIfChanged(def.cvar, CFG[key] and 1 or 0)
+        if not PERSONAL_RESOURCE_BOOLEAN_CVAR_KEYS[key] then
+            SetCVarIfChanged(def.cvar, CFG[key] and 1 or 0)
+        end
     end
 
+    ApplyPersonalResourceDisplayCVarSettings(true)
     State.applyingNameplateCVars = false
 end
 

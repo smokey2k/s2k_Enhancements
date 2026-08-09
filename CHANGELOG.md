@@ -1,5 +1,6 @@
 # s2k:Enhancements 1.33.0
 
+- Made the Personal Resource Display toggle apply its Legion visibility CVars in a stable order, verify the result and retry short-lived client overrides.
 - Stabilized the Personal Resource Bar with an addon-owned, event-driven status bar that Blizzard target and power scripts cannot hide or reposition.
 - Made the Personal Resource Bar visible only while its current power value is greater than zero, with dependent layout nodes collapsing when it becomes empty.
 - Replaced all Blizzard Personal Resource Display resource frames with addon-owned power and class-resource frames driven only by Legion unit-power and rune events.
